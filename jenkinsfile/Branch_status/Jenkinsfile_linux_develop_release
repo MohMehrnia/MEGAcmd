@@ -75,8 +75,9 @@ pipeline {
                         }
                         environment {
                             ASAN_OPTIONS="print_stats=1,log_path=${megacmd_sources_workspace}/test-dir-${SANITIZERS}/results/unit-asan-report.log"
-                            TSAN_OPTIONS="log_path=${megacmd_sources_workspace}/test-dir-${SANITIZERS}/results/unit-tsan-report.log"
+                            TSAN_OPTIONS="log_path=${megacmd_sources_workspace}/test-dir-${SANITIZERS}/results/unit-tsan-report.log suppressions=${megacmd_sources_workspace}/contrib/sanitizer/tsan.suppressions "
                             UBSAN_OPTIONS="log_path=${megacmd_sources_workspace}/test-dir-${SANITIZERS}/results/unit-ubsan-report.log"
+                            LSAN_OPTIONS="suppressions=${megacmd_sources_workspace}/contrib/sanitizer/lsan.suppressions"
                             HOME="${megacmd_sources_workspace}/test-dir-${SANITIZERS}"
                         }
                         steps {
