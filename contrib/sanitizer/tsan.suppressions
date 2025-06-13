@@ -1,1 +1,1 @@
-race:^mega::Syncs::deregisterThenRemoveSync$
+race:^mega::Syncs::deregisterThenRemoveSync.*$
