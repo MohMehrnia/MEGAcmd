@@ -4200,7 +4200,7 @@ void MegaCmdExecuter::signup(string name, string passwd, string email)
         return;
     }
 
-    OUTSTREAM << "Singing up. name=" << firstname << ". surname=" << lastname<< endl;
+    OUTSTREAM << "Signing up. name=" << firstname << ". surname=" << lastname<< endl;
 
     api->createAccount(email.c_str(), passwd.c_str(), firstname.c_str(), lastname.c_str(), megaCmdListener);
     megaCmdListener->wait();
@@ -7090,7 +7090,7 @@ void MegaCmdExecuter::executecommand(vector<string> words, map<string, int> *clf
             else
             {
                 setCurrentThreadOutCode(MCMD_NOTFOUND);
-                LOG_err << "Couln't find destination folder: " << destination << ". Use -c to create folder structure";
+                LOG_err << "Couldn't find destination folder: " << destination << ". Use -c to create folder structure";
             }
         }
         else
@@ -7221,7 +7221,7 @@ void MegaCmdExecuter::executecommand(vector<string> words, map<string, int> *clf
             else if (getFlag(clflags, "i"))
             {
                 action = MegaContactRequest::REPLY_ACTION_IGNORE;
-                saction = "Ignore";
+                saction = "Ignor";
             }
             else
             {
@@ -9488,7 +9488,7 @@ void MegaCmdExecuter::executecommand(vector<string> words, map<string, int> *clf
         if (api->isLoggedIn())
         {
             setCurrentThreadOutCode(MCMD_INVALIDSTATE);
-            LOG_err << "Please loggout first ";
+            LOG_err << "Please logout first ";
         }
         else if (words.size() > 1)
         {
