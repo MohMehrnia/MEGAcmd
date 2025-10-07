@@ -1392,7 +1392,7 @@ void process_line(const char * line)
                     }
                     else
                     {
-                        cerr << "Please loggout first." << endl;
+                        cerr << "Please logout first." << endl;
                     }
                     return;
                 }
