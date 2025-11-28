@@ -7142,7 +7142,16 @@ void MegaCmdExecuter::executecommand(vector<string> words, map<string, int> *clf
             {
                 const bool jsonLogs = (newLogLevel == MegaApi::LOG_LEVEL_MAX);
                 loggerCMD->setSdkLoggerLevel(newLogLevel);
-                api->setLogJSONContent(jsonLogs);
+                if (jsonLogs)
+                {
+                    api->setLogJSON(MegaApi::JSON_LOG_CHUNK_RECEIVED | MegaApi::JSON_LOG_CHUNK_CONSUMED | MegaApi::JSON_LOG_SENDING | MegaApi::JSON_LOG_NONCHUNK_RECEIVED);
+                    SimpleLogger::setMaxPayloadLogSize(0); // Max size
+                }
+                else
+                {
+                    api->setLogJSON(MegaApi::JSON_LOG_CHUNK_CONSUMED | MegaApi::JSON_LOG_SENDING | MegaApi::JSON_LOG_NONCHUNK_RECEIVED);
+                    SimpleLogger::setMaxPayloadLogSize(); // Default
+                }
 
                 ConfigurationManager::savePropertyValue("sdkLogLevel", newLogLevel);
                 ConfigurationManager::savePropertyValue("jsonLogs", jsonLogs);
