@@ -3372,7 +3372,6 @@ void MegaCmdExecuter::downloadNode(string source, string path, MegaApi* api, Meg
 
 class SelfDestructingTransferStartCallbackListener: public MegaTransferListener
 {
-
     std::function<void(MegaTransfer*)> mOnTransferStart;
 public:
 
@@ -3385,7 +3384,6 @@ public:
         mOnTransferStart(transfer);
     }
 
-    // MegaTransferListener interface
 public:
     void onTransferFinish(MegaApi *api, MegaTransfer *transfer, MegaError *error) override
     {
@@ -3413,15 +3411,13 @@ void MegaCmdExecuter::uploadNode(const std::map<std::string, int> &clflags, cons
 
     MegaTransferListener *thelistener = nullptr;
 
-    std::optional<std::promise<void>> promiseStarted;
+    std::optional<std::promise<std::pair<int/*tag*/, std::string/*path*/>>> promiseStarted;
     if (printTag)
     {
         promiseStarted.emplace();
-        LoggedStream &out = OUTSTREAM;
-        auto onTransferStartCb = [clientID, &out, &promiseStarted](MegaTransfer *transfer)
+        auto onTransferStartCb = [&promiseStarted](MegaTransfer *transfer)
         {
-            out << "Upload started: Tag = " << transfer->getTag() << ". Source = " << transfer->getPath() << std::endl;
-            promiseStarted->set_value();
+            promiseStarted->set_value({transfer->getTag(), transfer->getPath()});
         };
 
         if (background)
@@ -3437,7 +3433,7 @@ void MegaCmdExecuter::uploadNode(const std::map<std::string, int> &clflags, cons
 
     if (!background)
     {
-        // need  MegaCmdMultiTransferListener to have some reseteable mOnTransferStart
+        // needs MegaCmdMultiTransferListener to have some reseteable mOnTransferStart
         assert(multiTransferListener);
         multiTransferListener->onNewTransfer();
         thelistener = multiTransferListener;
@@ -3462,9 +3458,9 @@ void MegaCmdExecuter::uploadNode(const std::map<std::string, int> &clflags, cons
 
     if (promiseStarted)
     {
-        promiseStarted->get_future().wait();
+        auto [tag, path] = promiseStarted->get_future().get();
+        OUTSTREAM << "Upload started: Tag = " << tag << ". Source = " << path << std::endl;
     }
-
 }
 
 
