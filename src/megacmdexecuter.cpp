@@ -4477,7 +4477,11 @@ void MegaCmdExecuter::printTransferColumnDisplayer(ColumnDisplayer *cd, MegaTran
             std::string parentnodepathS(parentNodePath ? parentNodePath.get() : "<lost_node>");
             if (transfer->getFileName())
             {
-                parentnodepathS.append("/").append(transfer->getFileName());
+                if (!parentnodepathS.empty() && parentnodepathS.back() != '/')
+                {
+                    parentnodepathS.append("/");
+                }
+                parentnodepathS.append(transfer->getFileName());
             }
 
             cd->addValue("DESTINYPATH", parentnodepathS);
