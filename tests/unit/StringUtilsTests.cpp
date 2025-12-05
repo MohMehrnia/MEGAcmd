@@ -54,8 +54,8 @@ TEST(StringUtilsTest, rtrim)
     G_SUBTEST << "Basic case";
     {
         std::string s("123456");
-        EXPECT_STREQ(rtrim(s, '2').c_str(), "123456");
-        EXPECT_STREQ(rtrim(s, '6').c_str(), "12345");
+        EXPECT_EQ(rtrim(s, '2'), "123456");
+        EXPECT_EQ(rtrim(s, '6'), "12345");
     }
 
     G_SUBTEST << "Empty string";
