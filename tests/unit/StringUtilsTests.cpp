@@ -51,7 +51,7 @@ TEST(StringUtilsTest, rtrim)
 {
     using megacmd::rtrim;
 
-    G_SUBTEST << "Basic cases";
+    G_SUBTEST << "Basic case";
     {
         std::string s("123456");
         EXPECT_STREQ(rtrim(s, '2').c_str(), "123456");
@@ -61,32 +61,32 @@ TEST(StringUtilsTest, rtrim)
     G_SUBTEST << "Empty string";
     {
         std::string s;
-        EXPECT_STREQ(rtrim(s, ' ').c_str(), "");
+        EXPECT_EQ(rtrim(s, ' ').length(), 0);
     }
 
     G_SUBTEST << "Only trim character";
     {
         std::string s("   ");
-        EXPECT_STREQ(rtrim(s, ' ').c_str(), "");
+        EXPECT_EQ(rtrim(s, ' ').length(), 0);
     }
 
     G_SUBTEST << "Multiple consecutive";
     {
         std::string s("11223344");
-        EXPECT_STREQ(rtrim(s, '4').c_str(), "112233");
+        EXPECT_EQ(rtrim(s, '4'), "112233");
     }
 
     G_SUBTEST << "Special case with next character check";
     {
         std::string s("aab");
         rtrim(s, 'a');
-        EXPECT_STREQ(s.c_str(), "aab");
+        EXPECT_EQ(s, "aab");
     }
 
     G_SUBTEST << "Single character at end";
     {
         std::string s("abc123");
-        EXPECT_STREQ(rtrim(s, '3').c_str(), "abc12");
+        EXPECT_EQ(rtrim(s, '3'), "abc12");
     }
 
     G_SUBTEST << "Unicode characters";
@@ -95,25 +95,25 @@ TEST(StringUtilsTest, rtrim)
         EXPECT_TRUE(megacmd::isValidUtf8(s));
         std::string result = rtrim(s, ' ');
         EXPECT_TRUE(megacmd::isValidUtf8(result));
-        EXPECT_STREQ(result.c_str(), "\xD0\x9C\xD0\x95\xD0\x93\xD0\x90");
+        EXPECT_EQ(result, "\xD0\x9C\xD0\x95\xD0\x93\xD0\x90");
     }
 
     G_SUBTEST << "Single character string (trim character)";
     {
         std::string s("X");
-        EXPECT_STREQ(rtrim(s, 'X').c_str(), "");
+        EXPECT_EQ(rtrim(s, 'X').length(), 0);
     }
 
     G_SUBTEST << "Single character string (not trim character)";
     {
         std::string s("X");
-        EXPECT_STREQ(rtrim(s, 'Y').c_str(), "X");
+        EXPECT_EQ(rtrim(s, 'Y'), "X");
     }
 
     G_SUBTEST << "Special characters";
     {
         std::string s("test\t\t\t");
-        EXPECT_STREQ(rtrim(s, '\t').c_str(), "test");
+        EXPECT_EQ(rtrim(s, '\t'), "test");
     }
 }
 
