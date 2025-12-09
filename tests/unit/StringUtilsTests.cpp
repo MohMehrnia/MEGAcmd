@@ -47,6 +47,76 @@ TEST(StringUtilsTest, trimming)
     StringUtilsTest::trimming();
 }
 
+TEST(StringUtilsTest, rtrim)
+{
+    using megacmd::rtrim;
+
+    G_SUBTEST << "Basic case";
+    {
+        std::string s("123456");
+        EXPECT_EQ(rtrim(s, '2'), "123456");
+        EXPECT_EQ(rtrim(s, '6'), "12345");
+    }
+
+    G_SUBTEST << "Empty string";
+    {
+        std::string s;
+        EXPECT_EQ(rtrim(s, ' ').length(), 0);
+    }
+
+    G_SUBTEST << "Only trim character";
+    {
+        std::string s("   ");
+        EXPECT_EQ(rtrim(s, ' ').length(), 0);
+    }
+
+    G_SUBTEST << "Multiple consecutive";
+    {
+        std::string s("11223344");
+        EXPECT_EQ(rtrim(s, '4'), "112233");
+    }
+
+    G_SUBTEST << "Special case with next character check";
+    {
+        std::string s("aab");
+        rtrim(s, 'a');
+        EXPECT_EQ(s, "aab");
+    }
+
+    G_SUBTEST << "Single character at end";
+    {
+        std::string s("abc123");
+        EXPECT_EQ(rtrim(s, '3'), "abc12");
+    }
+
+    G_SUBTEST << "Unicode characters";
+    {
+        std::string s("\xD0\x9C\xD0\x95\xD0\x93\xD0\x90   ");
+        EXPECT_TRUE(megacmd::isValidUtf8(s));
+        std::string result = rtrim(s, ' ');
+        EXPECT_TRUE(megacmd::isValidUtf8(result));
+        EXPECT_EQ(result, "\xD0\x9C\xD0\x95\xD0\x93\xD0\x90");
+    }
+
+    G_SUBTEST << "Single character string (trim character)";
+    {
+        std::string s("X");
+        EXPECT_EQ(rtrim(s, 'X').length(), 0);
+    }
+
+    G_SUBTEST << "Single character string (not trim character)";
+    {
+        std::string s("X");
+        EXPECT_EQ(rtrim(s, 'Y'), "X");
+    }
+
+    G_SUBTEST << "Special characters";
+    {
+        std::string s("test\t\t\t");
+        EXPECT_EQ(rtrim(s, '\t'), "test");
+    }
+}
+
 TEST(StringUtilsTest, ValidateUtf8)
 {
     // from: https://www.php.net/manual/en/reference.pcre.pattern.modifiers.php#54805

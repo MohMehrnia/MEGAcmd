@@ -368,17 +368,8 @@ std::string_view ltrim(const std::string_view s, const char &c)
 
 std::string &rtrim(std::string &s, const char &c)
 {
-    size_t pos = s.find_last_of(c);
-    size_t last = pos == string::npos ? s.length() : pos;
-    if (last + 1 < s.length())
-    {
-        if (s.at(last + 1) != c)
-        {
-            last = s.length();
-        }
-    }
-
-    s = s.substr(0, last);
+    size_t pos = s.find_last_not_of(c);
+    s.resize(pos == std::string::npos ? 0 : pos + 1);
     return s;
 }
 
