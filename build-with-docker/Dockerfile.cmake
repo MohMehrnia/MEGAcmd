@@ -78,7 +78,7 @@ RUN --mount=type=cache,target=/tmp/ccache \
     -DENABLE_TSAN=${ENABLE_tsan} \
     -DENABLE_MEGACMD_TESTS=${ENABLE_MEGACMD_TESTS} \
     -DWITH_FUSE=ON \
-    && cmake --build /tmp/build -j$(nproc) --target mega-cmd mega-cmd-server mega-exec \
+    && cmake --build /tmp/build -j4 --target mega-cmd mega-cmd-server mega-exec \
     mega-cmd-updater mega-cmd-tests-integration mega-cmd-tests-unit \
     && cmake --install /tmp/build #|| mkdir /inspectme && mv /tmp/build/* /vcpkg  /inspectme
 
