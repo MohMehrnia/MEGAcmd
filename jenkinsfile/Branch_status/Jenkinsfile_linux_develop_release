@@ -57,9 +57,19 @@ pipeline {
                         }
                         environment {
                             DOCKER_BUILDKIT=1
+                            BUILD_CORES=4
                         }
                         steps {
-                            sh "docker build -t meganz/megacmd-branchstatus-${BUILD_SYSTEM}-${SANITIZERS}:${env.BUILD_NUMBER} -f ${megacmd_sources_workspace}/build-with-docker/Dockerfile.${BUILD_SYSTEM} --build-arg=ENABLE_${SANITIZERS}=ON --ulimit=core=-1 --cpuset-cpus=0,1 -- ${megacmd_sources_workspace}"
+                            sh """
+                                docker build \
+                                  -t meganz/megacmd-branchstatus-${BUILD_SYSTEM}-${SANITIZERS}:${env.BUILD_NUMBER} \
+                                  -f ${megacmd_sources_workspace}/build-with-docker/Dockerfile.${BUILD_SYSTEM} \
+                                  --build-arg=ENABLE_${SANITIZERS}=ON \
+                                  --build-arg=BUILD_CORES \
+                                  --ulimit=core=-1 \
+                                  --cpuset-cpus=0,1 \
+                                  -- ${megacmd_sources_workspace}
+                            """
                         }
                     }
                     stage("MEGAcmd unit tests") {
