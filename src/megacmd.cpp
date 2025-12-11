@@ -5482,8 +5482,8 @@ int executeServer(int argc, char* argv[],
     api->setLanguage(localecode.c_str());
     if (logConfig.mJsonLogs)
     {
-        api->setLogJSON(MegaApi::JSON_LOG_CHUNK_RECEIVED | MegaApi::JSON_LOG_CHUNK_CONSUMED | MegaApi::JSON_LOG_SENDING | MegaApi::JSON_LOG_NONCHUNK_RECEIVED);
-        SimpleLogger::setMaxPayloadLogSize(0); // Max size
+        MegaApi::setLogJSON(MegaApi::JSON_LOG_CHUNK_RECEIVED | MegaApi::JSON_LOG_CHUNK_CONSUMED | MegaApi::JSON_LOG_SENDING | MegaApi::JSON_LOG_NONCHUNK_RECEIVED);
+        MegaApi::setMaxPayloadLogSize(0); // Max size
     }
     LOG_debug << "Language set to: " << localecode;
 
@@ -5503,11 +5503,6 @@ int executeServer(int argc, char* argv[],
 
         MegaApi *apiFolder = new MegaApi("BdARkQSQ", apiFolderStrUtf8.c_str(), userAgent);
         apiFolder->setLanguage(localecode.c_str());
-        apiFolder->setLogLevel(MegaApi::LOG_LEVEL_MAX);
-        if (logConfig.mJsonLogs)
-        {
-            apiFolder->setLogJSON(MegaApi::JSON_LOG_CHUNK_RECEIVED | MegaApi::JSON_LOG_CHUNK_CONSUMED | MegaApi::JSON_LOG_SENDING | MegaApi::JSON_LOG_NONCHUNK_RECEIVED);
-        }
         apiFolder->addGlobalListener(cmdFatalErrorListener.get());
 
         apiFolders.push(apiFolder);

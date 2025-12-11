@@ -7144,13 +7144,13 @@ void MegaCmdExecuter::executecommand(vector<string> words, map<string, int> *clf
                 loggerCMD->setSdkLoggerLevel(newLogLevel);
                 if (jsonLogs)
                 {
-                    api->setLogJSON(MegaApi::JSON_LOG_CHUNK_RECEIVED | MegaApi::JSON_LOG_CHUNK_CONSUMED | MegaApi::JSON_LOG_SENDING | MegaApi::JSON_LOG_NONCHUNK_RECEIVED);
-                    SimpleLogger::setMaxPayloadLogSize(0); // Max size
+                    MegaApi::setLogJSON(MegaApi::JSON_LOG_CHUNK_RECEIVED | MegaApi::JSON_LOG_CHUNK_CONSUMED | MegaApi::JSON_LOG_SENDING | MegaApi::JSON_LOG_NONCHUNK_RECEIVED);
+                    MegaApi::setMaxPayloadLogSize(0); // Max size
                 }
-                else
+                else // revert to defaults
                 {
-                    api->setLogJSON(MegaApi::JSON_LOG_CHUNK_CONSUMED | MegaApi::JSON_LOG_SENDING | MegaApi::JSON_LOG_NONCHUNK_RECEIVED);
-                    SimpleLogger::setMaxPayloadLogSize(); // Default
+                    MegaApi::setLogJSON(MegaApi::JSON_LOG_CHUNK_CONSUMED | MegaApi::JSON_LOG_SENDING | MegaApi::JSON_LOG_NONCHUNK_RECEIVED);
+                    MegaApi::setMaxPayloadLogSize(10240/*PAYLOAD_LOG_DEFAULT_SIZE*/); // Default
                 }
 
                 ConfigurationManager::savePropertyValue("sdkLogLevel", newLogLevel);
