@@ -1,1 +1,2 @@
+race:mega::Syncs::deregisterThenRemoveSync
 race:megacmd::ComunicationsManagerFileSockets::~ComunicationsManagerFileSockets
