@@ -3391,15 +3391,13 @@ public:
     }
 };
 
-
 void MegaCmdExecuter::uploadNode(const std::map<std::string, int> &clflags, const std::map<std::string, std::string> &cloptions,
-                                 string path, MegaApi* api, MegaNode *node, string newname,
+                                 const std::string &receivedPath, MegaApi* api, MegaNode *node, const string &newname,
                                  MegaCmdMultiTransferListener *multiTransferListener)
 {
-    bool background = getFlag(&clflags,"q");
     bool printTag = getFlag(&clflags,"print-tag-at-start");
-    int clientID = getintOption(&cloptions, "clientID", -1);
 
+    std::string path = receivedPath;
     unescapeifRequired(path);
 
     if (!pathExists(path))
@@ -3409,7 +3407,7 @@ void MegaCmdExecuter::uploadNode(const std::map<std::string, int> &clflags, cons
         return;
     }
 
-    MegaTransferListener *thelistener = nullptr;
+    MegaTransferListener *thelistener = multiTransferListener;
 
     std::optional<std::promise<std::pair<int/*tag*/, std::string/*path*/>>> promiseStarted;
     if (printTag)
@@ -3420,23 +3418,20 @@ void MegaCmdExecuter::uploadNode(const std::map<std::string, int> &clflags, cons
             promiseStarted->set_value({transfer->getTag(), transfer->getPath()});
         };
 
-        if (background)
+        if (multiTransferListener)
         {
-            thelistener =  new SelfDestructingTransferStartCallbackListener(std::move(onTransferStartCb));
+            multiTransferListener->setOnTransferStartCb(std::move(onTransferStartCb));
         }
         else
         {
-            assert(multiTransferListener);
-            multiTransferListener->setOnTransferStartCb(std::move(onTransferStartCb));
+            // create a listener for the shake of printing the tag.
+            thelistener = new SelfDestructingTransferStartCallbackListener(std::move(onTransferStartCb));
         }
     }
 
-    if (!background)
+    if (multiTransferListener)
     {
-        // needs MegaCmdMultiTransferListener to have some reseteable mOnTransferStart
-        assert(multiTransferListener);
         multiTransferListener->onNewTransfer();
-        thelistener = multiTransferListener;
     }
 
 #ifdef _WIN32
@@ -7002,127 +6997,124 @@ void MegaCmdExecuter::executecommand(vector<string> words, map<string, int> *clf
         }
 
         bool background = getFlag(clflags,"q");
+        bool autocreate = getFlag(clflags, "c");
+
         int clientID = getintOption(cloptions, "clientID", -1);
 
-        auto megaCmdMultiTransferListener = std::make_unique<MegaCmdMultiTransferListener>(api, sandboxCMD, nullptr,
-                                                                                           background ? -1 : clientID);
-        if (words.size() > 1)
-        {
-            string targetuser;
-            string newname = "";
-            string destination = "";
-
-            std::unique_ptr<MegaNode> n;
-
-            if (words.size() > 2)
-            {
-                destination = words[words.size() - 1];
-                n = nodebypath(destination.c_str(), &targetuser, &newname);
-
-                if (!n && getFlag(clflags,"c"))
-                {
-                    string destinationfolder(destination,0,destination.find_last_of("/"));
-                    newname=string(destination,destination.find_last_of("/")+1,destination.size());
-                    MegaNode *cwdNode = api->getNodeByHandle(cwd);
-                    makedir(destinationfolder,true,cwdNode);
-                    n = nodebypath(destinationfolder.c_str());
-                    delete cwdNode;
-                }
-            }
-            else
-            {
-                n.reset(api->getNodeByHandle(cwd));
-                words.push_back(".");
-            }
-
-            if (n)
-            {
-                if (n->getType() != MegaNode::TYPE_FILE)
-                {
-                    for (int i = 1; i < max(1, (int)words.size() - 1); i++)
-                    {
-                        if (words[i] == ".")
-                        {
-                            words[i] = getLPWD();
-                        }
-
-#ifdef HAVE_GLOB_H
-                        if (!newname.size() && !fs::exists(words[i]) && hasWildCards(words[i]))
-                        {
-                            auto paths = resolvewildcard(words[i]);
-                            if (!paths.size())
-                            {
-                                setCurrentThreadOutCode(MCMD_NOTFOUND);
-                                LOG_err << words[i] << " not found";
-                            }
-                            for (auto path : paths)
-                            {
-                                uploadNode(*clflags, *cloptions, path, api, n.get(), newname, megaCmdMultiTransferListener.get());
-                            }
-                        }
-                        else
-#endif
-                        {
-                            uploadNode(*clflags, *cloptions, words[i], api, n.get(), newname, megaCmdMultiTransferListener.get());
-                        }
-                    }
-                }
-                else if (words.size() == 3 && !IsFolder(words[1])) //replace file
-                {
-                    unique_ptr<MegaNode> pn(api->getNodeByHandle(n->getParentHandle()));
-                    if (pn)
-                    {
-#ifdef HAVE_GLOB_H
-                        if (!fs::exists(words[1]) && hasWildCards(words[1]))
-                        {
-                            LOG_err << "Invalid target for wildcard expression: " << words[1] << ". Folder expected";
-                            setCurrentThreadOutCode(MCMD_INVALIDTYPE);
-                        }
-                        else
-#endif
-                        {
-                            uploadNode(*clflags, *cloptions, words[1], api, pn.get(), n->getName(), megaCmdMultiTransferListener.get());
-                        }
-                    }
-                    else
-                    {
-                        setCurrentThreadOutCode(MCMD_NOTFOUND);
-                        LOG_err << "Destination is not valid. Parent folder cannot be found";
-                    }
-                }
-                else
-                {
-                    setCurrentThreadOutCode(MCMD_INVALIDTYPE);
-                    LOG_err << "Destination is not valid (expected folder or alike)";
-                }
-
-                if (background)
-                {
-
-                }
-                else
-                {
-                    megaCmdMultiTransferListener->waitMultiEnd();
-                    checkNoErrors(megaCmdMultiTransferListener->getFinalerror(), "upload");
-
-                    if (megaCmdMultiTransferListener->getProgressinformed() || getCurrentThreadOutCode() == MCMD_OK )
-                    {
-                        informProgressUpdate(PROGRESS_COMPLETE, megaCmdMultiTransferListener->getTotalbytes(), clientID);
-                    }
-                }
-            }
-            else
-            {
-                setCurrentThreadOutCode(MCMD_NOTFOUND);
-                LOG_err << "Couldn't find destination folder: " << destination << ". Use -c to create folder structure";
-            }
-        }
-        else
+        if (words.size() < 2)
         {
             setCurrentThreadOutCode(MCMD_EARGS);
             LOG_err << "      " << getUsageStr("put");
+            return;
         }
 
+        string targetuser;
+        string newname = "";
+
+        bool explicitRemotePath =  words.size() > 2;
+        std::size_t numberOfLocalPaths = explicitRemotePath ? words.size() - 2ul : 1;
+
+        const std::string &destination = explicitRemotePath ? words.back() : "";
+
+        std::unique_ptr<MegaNode> n = explicitRemotePath ?
+                    nodebypath(destination.c_str(), &targetuser, &newname)
+                  : std::unique_ptr<MegaNode>(api->getNodeByHandle(cwd));
+
+        if (explicitRemotePath && !n && autocreate)
+        {
+            const auto posLastSeparator = destination.find_last_of("/");
+            string destinationfolder(destination, 0, posLastSeparator);
+            newname = string(destination, posLastSeparator + 1, destination.size());
+            std::unique_ptr<MegaNode> cwdNode(api->getNodeByHandle(cwd));
+            makedir(destinationfolder, true, cwdNode.get());
+            n = nodebypath(destinationfolder.c_str());
+        }
+
+        if (!n)
+        {
+            setCurrentThreadOutCode(MCMD_NOTFOUND);
+            LOG_err << "Couldn't find destination folder: " << destination << ". Use -c to create folder structure";
+            return;
+        }
+
+        std::optional<MegaCmdMultiTransferListener> foregroundMultiTransfersListener;
+        auto mayCreateForegroundListener = [&]() -> MegaCmdMultiTransferListener *
+        {
+            if (background)
+            {
+                return nullptr;
+            }
+            if (!foregroundMultiTransfersListener)
+            {
+                foregroundMultiTransfersListener.emplace(api, sandboxCMD, nullptr, clientID);
+            }
+            return &foregroundMultiTransfersListener.value();
+        };
+
+        ScopeGuard g([&]
+        {
+            if (foregroundMultiTransfersListener)
+            {
+                foregroundMultiTransfersListener->waitMultiEnd();
+                checkNoErrors(foregroundMultiTransfersListener->getFinalerror(), "upload");
+
+                if (foregroundMultiTransfersListener->getProgressinformed() || getCurrentThreadOutCode() == MCMD_OK )
+                {
+                    informProgressUpdate(PROGRESS_COMPLETE, foregroundMultiTransfersListener->getTotalbytes(), clientID);
+                }
+            }
+        });
+
+        if (n->getType() == MegaNode::TYPE_FILE)
+        {
+            bool replacing = words.size() == 3 && !IsFolder(words[1]);
+            if (!replacing)
+            {
+                setCurrentThreadOutCode(MCMD_INVALIDTYPE);
+                LOG_err << "Destination is not valid (expected folder or alike)";
+                return;
+            }
+            unique_ptr<MegaNode> pn(api->getNodeByHandle(n->getParentHandle()));
+            if (!pn)
+            {
+                setCurrentThreadOutCode(MCMD_NOTFOUND);
+                LOG_err << "Destination is not valid. Parent folder cannot be found";
+                return;
+            }
+
+#ifdef HAVE_GLOB_H
+            auto &localPath = words[1];
+            if (!fs::exists(localPath) && hasWildCards(localPath))
+            {
+                LOG_err << "Invalid target for wildcard expression: " << localPath << ". Folder expected";
+                setCurrentThreadOutCode(MCMD_INVALIDTYPE);
+                return;
+            }
+#endif
+            uploadNode(*clflags, *cloptions, localPath, api, pn.get(), n->getName(), mayCreateForegroundListener());
+            return;
+        }
+
+        assert(n->getType() != MegaNode::TYPE_FILE);
+        for (std::size_t i = 1; i <= numberOfLocalPaths; i++)
+        {
+            std::vector<std::string> paths{words[i] == "." ? getLPWD() : words[i]};
+#ifdef HAVE_GLOB_H
+            if (!newname.size() && !fs::exists(words[i]) && hasWildCards(words[i]))
+            {
+                paths = resolvewildcard(words[i]);
+                if (!paths.size())
+                {
+                    setCurrentThreadOutCode(MCMD_NOTFOUND);
+                    LOG_err << words[i] << " not found";
+                }
+            }
+#endif
+            for (auto &path : paths)
+            {
+                uploadNode(*clflags, *cloptions, path, api, n.get(), newname, mayCreateForegroundListener());
+            }
+        }
         return;
     }
     else if (words[0] == "log")
