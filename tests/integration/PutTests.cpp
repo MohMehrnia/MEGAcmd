@@ -446,3 +446,35 @@ TEST_F(PutTests, PutDirectoryTreeShowsUp)
     ASSERT_TRUE(r.ok()) << r.err();
     EXPECT_THAT(r.out(), testing::HasSubstr("b.txt"));
 }
+
+TEST_F(PutTests, PutPrintTagAtStartPrintsDecimalTag)
+{
+    const std::string filename = "tag_test.txt";
+    createLocalFile(filename, "tag\n");
+
+    auto r = executeInClient({"put", "--print-tag-at-start", (localPath() / filename).string()});
+    ASSERT_TRUE(r.ok()) << r.err();
+
+    const std::string out = r.out();
+
+    // Must contain the prefix
+    const std::string prefix = "Upload started: Tag = ";
+    auto pos = out.find(prefix);
+    ASSERT_NE(pos, std::string::npos) << "Output did not contain expected prefix. out=\n" << out;
+
+    pos += prefix.size();
+    ASSERT_LT(pos, out.size()) << "No characters after tag prefix. out=\n" << out;
+
+    // Parse consecutive decimal digits after the prefix
+    std::size_t end = pos;
+    while (end < out.size() && std::isdigit(static_cast<unsigned char>(out[end])))
+    {
+        ++end;
+    }
+
+    ASSERT_GT(end, pos) << "Tag was not a decimal number. out=\n" << out;
+
+    // Optional: sanity check it is followed by "."
+    // (keeps it aligned with the format, but still doesn't validate path)
+    ASSERT_TRUE(end < out.size() && out[end] == '.') << "Expected '.' after decimal tag. out=\n" << out;
+}
