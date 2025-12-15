@@ -7082,8 +7082,8 @@ void MegaCmdExecuter::executecommand(vector<string> words, map<string, int> *clf
                 return;
             }
 
-#ifdef HAVE_GLOB_H
             auto &localPath = words[1];
+#ifdef HAVE_GLOB_H
             if (!fs::exists(localPath) && hasWildCards(localPath))
             {
                 LOG_err << "Invalid target for wildcard expression: " << localPath << ". Folder expected";
