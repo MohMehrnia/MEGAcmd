@@ -1,6 +1,6 @@
 # MEGAcmd User Guide
 
-This document relates to MEGAcmd version 2.3.0.  It contains introductory information and the [Command Summary](#command-summary), with links to detailed command descriptions.
+This document relates to MEGAcmd version 2.4.0.  It contains introductory information and the [Command Summary](#command-summary), with links to detailed command descriptions.
 
 ### What is it
 A command line tool to work with your MEGA account and files.  The intent is to offer all the MEGA account functionality via command line.  You can run it in [interactive](#interactive) mode where it processes all commands directly, or you can run its [scriptable](#scriptable) commands from your favourite Linux or Mac shell such as bash, or you can even run its commands in a Windows command prompt. And of course you can write scripts using those scriptable commands.
@@ -213,7 +213,7 @@ Verbosity: You can increase the amount of information given by any command by pa
 ### Moving / Copying files
 * [`mkdir`](contrib/docs/commands/mkdir.md)`[-p] remotepath` Creates a directory or a directories hierarchy
 * [`cp`](contrib/docs/commands/cp.md)`[--use-pcre] srcremotepath [srcremotepath2 srcremotepath3 ..] dstremotepath|dstemail` : Copies files/folders into a new location (all remotes)
-* [`put`](contrib/docs/commands/put.md)`[-c] [-q] [--ignore-quota-warn] localfile [localfile2 localfile3 ...] [dstremotepath]` Uploads files/folders to a remote folder
+* [`put`](contrib/docs/commands/put.md)`[-c] [-q] [--print-tag-at-start] localfile [localfile2 localfile3 ...] [dstremotepath]` Uploads files/folders to a remote folder
 * [`get`](contrib/docs/commands/get.md)`[-m] [-q] [--ignore-quota-warn] [--use-pcre] [--password=PASSWORD] exportedlink|remotepath [localpath]` Downloads a remote file/folder or a public link
 * [`preview`](contrib/docs/commands/preview.md)`[-s] remotepath localpath` To download/upload the preview of a file.
 * [`thumbnail`](contrib/docs/commands/thumbnail.md)`[-s] remotepath localpath` To download/upload the thumbnail of a file.
@@ -243,7 +243,7 @@ Verbosity: You can increase the amount of information given by any command by pa
 * [`fuse-config`](contrib/docs/commands/fuse-config.md)`[--name=name] [--enable-at-startup=yes|no] [--persistent=yes|no] [--read-only=yes|no] (name|localPath)` Modifies the specified FUSE mount configuration.
 
 ### Misc.
-* [`autocomplete`](contrib/docs/commands/autocomplete.md)`[dos | unix]` Modifes how tab completion operates.
+* [`autocomplete`](contrib/docs/commands/autocomplete.md)`[dos | unix]` Modifies how tab completion operates.
 * [`cancel`](contrib/docs/commands/cancel.md) Cancels your MEGA account
 * [`cat`](contrib/docs/commands/cat.md)`remotepath1 remotepath2 ...` Prints the contents of remote files
 * [`clear`](contrib/docs/commands/clear.md) Clear screen
