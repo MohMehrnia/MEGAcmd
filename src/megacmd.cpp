@@ -762,7 +762,8 @@ void insertValidParamsPerCommand(set<string> *validParams, string thecommand, se
     {
         validParams->insert("c");
         validParams->insert("q");
-        validParams->insert("ignore-quota-warn");
+        validParams->insert("print-tag-at-start");
+        validParams->insert("ignore-quota-warn"); //deprecated: no use
         validOptValues->insert("clientID");
     }
     else if ("get" == thecommand)
@@ -1707,7 +1708,7 @@ const char * getUsageStr(const char *command, const HelpFlags& flags)
     }
     if (!strcmp(command, "put"))
     {
-        return "put  [-c] [-q] [--ignore-quota-warn] localfile [localfile2 localfile3 ...] [dstremotepath]";
+        return "put  [-c] [-q] [--print-tag-at-start] localfile [localfile2 localfile3 ...] [dstremotepath]";
     }
     if (!strcmp(command, "putq"))
     {
@@ -2406,8 +2407,7 @@ string getHelpStr(const char *command, const HelpFlags& flags = {})
         os << "Options:" << endl;
         os << " -c" << "\t" << "Creates remote folder destination in case of not existing." << endl;
         os << " -q" << "\t" << "queue upload: execute in the background. Don't wait for it to end" << endl;
-        os << " --ignore-quota-warn" << "\t" << "ignore quota surpassing warning." << endl;
-        os << "                    " << "\t" << "  The upload will be attempted anyway." << endl;
+        os << " --print-tag-at-start" << "\t" << "Prints start message including transfer TAG, even when using -q." << endl;
 
         os << endl;
         os << "Notice that the dstremotepath can only be omitted when only one local path is provided." << endl;
