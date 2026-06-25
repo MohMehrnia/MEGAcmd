@@ -5440,8 +5440,8 @@ void MegaCmdExecuter::printInfoFile(MegaNode *n, bool &firstone, int PATHSIZE)
     }
     else
     {
-        MediaProperties mp = MediaProperties::decodeMediaPropertiesAttributes(fattrs, (uint32_t*)(n->getNodeKey()->data() + FILENODEKEYLENGTH / 2) );
-        OUTSTREAM << getFixLengthString( (mp.fps == 0) ? "---" : SSTR(mp.fps) , 3) << " ";
+        auto mp = MediaProperties::decodeMediaPropertiesAttributes(fattrs, (uint32_t*)(n->getNodeKey()->data() + FILENODEKEYLENGTH / 2) );
+        OUTSTREAM << getFixLengthString( (!mp || mp->fps == 0) ? "---" : SSTR(mp->fps) , 3) << " ";
     }
     OUTSTREAM << getFixLengthString( (n->getDuration() == -1) ? "---" : getReadablePeriod(n->getDuration()) , 10) << " ";
 
