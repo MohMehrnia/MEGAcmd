@@ -13,7 +13,11 @@ if errorlevel 1 (
     echo ERROR: Download failed
     exit /b 1
 )
-for /f %%H in ('sha256sum "%FILENAME%"') do set "ACTUAL_HASH=%%H"
+for /f %%H in ('powershell -NoProfile -Command "(Get-FileHash -Algorithm SHA256 -Path '%FILENAME%').Hash.ToLowerInvariant()"') do set "ACTUAL_HASH=%%H"
+if "%ACTUAL_HASH%"=="" (
+    echo ERROR: Failed to compute SHA256 checksum
+    exit /b 1
+)
 
 if /i "%ACTUAL_HASH%"=="%EXPECTED_HASH%" (
     echo Downloaded %FILENAME% correctly
