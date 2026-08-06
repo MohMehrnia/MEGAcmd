@@ -93,6 +93,9 @@ TEST(ConfiguratorMegaApiHelperTest, reclaimThresholdValidatorAcceptsBytesOffAndS
         EXPECT_FALSE(validate("abc"));
         EXPECT_FALSE(validate(""));
         EXPECT_FALSE(validate("12x"));
+        EXPECT_FALSE(validate(" -1"));
+        EXPECT_FALSE(validate("+1"));
+        EXPECT_FALSE(validate("9223372036854775808"));
     });
     EXPECT_TRUE(found);
 }
@@ -106,11 +109,29 @@ TEST(ConfiguratorMegaApiHelperTest, reclaimNonNegativeValidatorsRejectNegativesA
         const auto& validate = configurator.mValidator.value();
         EXPECT_TRUE(validate("0"));
         EXPECT_TRUE(validate("60"));
+        EXPECT_TRUE(validate("2147483647"));
+        EXPECT_FALSE(validate("2147483648"));
         EXPECT_FALSE(validate("-1"));
+        EXPECT_FALSE(validate(" -1"));
+        EXPECT_FALSE(validate(" 5"));
+        EXPECT_FALSE(validate("+5"));
+        EXPECT_FALSE(validate("18446744073709551616"));
         EXPECT_FALSE(validate("abc"));
         EXPECT_FALSE(validate("12x"));
     });
     EXPECT_TRUE(foundDelay);
+
+    // Period shares the seconds cap; 0 is not a valid interval.
+    const bool foundPeriod = withConfigurator(helper, "file_service_reclaim_period", [](const auto& configurator)
+    {
+        const auto& validate = configurator.mValidator.value();
+        EXPECT_FALSE(validate("0"));
+        EXPECT_TRUE(validate("7200"));
+        EXPECT_TRUE(validate("2147483647"));
+        EXPECT_FALSE(validate("2147483648"));
+        EXPECT_FALSE(validate("18446744073709551615"));
+    });
+    EXPECT_TRUE(foundPeriod);
 
     // Batch size must be at least one file per batch.
     const bool foundBatch = withConfigurator(helper, "file_service_reclaim_batch_size", [](const auto& configurator)
@@ -120,6 +141,7 @@ TEST(ConfiguratorMegaApiHelperTest, reclaimNonNegativeValidatorsRejectNegativesA
         EXPECT_TRUE(validate("1"));
         EXPECT_TRUE(validate("4"));
         EXPECT_FALSE(validate("-1"));
+        EXPECT_FALSE(validate(" -1"));
     });
     EXPECT_TRUE(foundBatch);
 

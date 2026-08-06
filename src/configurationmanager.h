@@ -22,6 +22,7 @@
 #include "megacmd.h"
 #include <map>
 #include <set>
+#include <utility>
 
 #ifndef _WIN32
 #include <sys/file.h> // LOCK_EX and LOCK_NB
@@ -310,10 +311,10 @@ class ConfiguratorMegaApiHelper
         std::optional<Validator> mValidator;
 
         template <typename S, typename G, typename MG, typename V>
-        ValueConfigurator(const char *key, const char *description, const char *fullDescription, S &&setter, G &&getter, MG &&megaApiGetter,  V &&validator)
-            : mKey(key)
-            , mDescription(description)
-            , mFullDescription(fullDescription)
+        ValueConfigurator(std::string key, std::string description, std::string fullDescription, S &&setter, G &&getter, MG &&megaApiGetter,  V &&validator)
+            : mKey(std::move(key))
+            , mDescription(std::move(description))
+            , mFullDescription(std::move(fullDescription))
             , mSetter(std::forward<S>(setter))
             , mGetter(std::forward<G>(getter))
             , mMegaApiGetter(std::forward<MG>(megaApiGetter))

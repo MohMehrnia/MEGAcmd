@@ -42,6 +42,7 @@
 #define USE_VARARGS
 #define PREFER_STDARG
 
+#include <algorithm>
 #include <iomanip>
 #include <string>
 #include <deque>
@@ -2792,9 +2793,13 @@ string getHelpStr(const char *command, const HelpFlags& flags = {})
             os << wrapText(vc.mFullDescription, 120 - descIndent - 1, descIndent) << endl;
         }
         os << endl;
-        os << "The file_service_reclaim_* keys tune the on-disk cache used by the streaming (ftp/webdav) file services." << endl;
-        os << "They are applied to the file service on each login. A change made while logged in takes effect immediately;" << endl;
-        os << "changing file_service_reclaim_delay re-arms the next reclaim to run that many seconds from when the change is applied." << endl;
+        os << "The file_service_reclaim_* keys control the automatic cleanup of the on-disk cache used by the" << endl;
+        os << "streaming (ftp/webdav) file services: when the cache grows past file_service_reclaim_threshold bytes," << endl;
+        os << "files unaccessed for at least file_service_reclaim_age_threshold minutes are removed until the cache" << endl;
+        os << "is down to file_service_reclaim_target bytes." << endl;
+        os << "Changes take effect immediately and are re-applied on each login. After a login or a change to any of" << endl;
+        os << "these keys, the first cleanup may run file_service_reclaim_delay seconds later; further cleanups follow" << endl;
+        os << "every file_service_reclaim_period seconds." << endl;
     }
     else if (!strcmp(command, "backup"))
     {
