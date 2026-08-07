@@ -299,8 +299,9 @@ public:
     // Stores a finished transfer, evicting the oldest one if the buffer is full.
     void addCompletedTransfer(std::unique_ptr<mega::MegaTransfer> transfer, const std::optional<std::string> &nodePath);
 
-    // Returns up to `max` accepted completed transfers, newest first.
-    std::vector<mega::MegaTransfer *> getCompletedTransfers(
+    // Returns up to `max` accepted completed transfers, newest first. The caller
+    // gets its own copies, so they stay valid however the buffer evolves.
+    std::vector<std::unique_ptr<mega::MegaTransfer>> getCompletedTransfers(
             size_t max, const std::function<bool(const mega::MegaTransfer &)> &accept);
 
     size_t getCompletedTransfersCount();

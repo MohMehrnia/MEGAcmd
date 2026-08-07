@@ -10675,7 +10675,7 @@ void MegaCmdExecuter::executecommand(vector<string> words, map<string, int> *clf
 
         vector<MegaTransfer *> transfersDLToShow;
         vector<MegaTransfer *> transfersUPToShow;
-        vector<MegaTransfer *> transfersCompletedToShow;
+        vector<std::unique_ptr<MegaTransfer>> transfersCompletedToShow;
 
         if (showcompleted)
         {
@@ -10755,7 +10755,7 @@ void MegaCmdExecuter::executecommand(vector<string> words, map<string, int> *clf
             }
         }
 
-        vector<MegaTransfer *>::iterator itCompleted = transfersCompletedToShow.begin();
+        auto itCompleted = transfersCompletedToShow.begin();
         vector<MegaTransfer *>::iterator itDLs = transfersDLToShow.begin();
         vector<MegaTransfer *>::iterator itUPs = transfersUPToShow.begin();
 
@@ -10779,7 +10779,7 @@ void MegaCmdExecuter::executecommand(vector<string> words, map<string, int> *clf
             }
             else
             {
-                transfer = (MegaTransfer *) *itCompleted;
+                transfer = itCompleted->get();
                 itCompleted++;
                 deleteTransfer=false;
             }

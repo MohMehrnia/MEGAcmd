@@ -1216,10 +1216,10 @@ void MegaCmdGlobalTransferListener::addCompletedTransfer(std::unique_ptr<MegaTra
     }
 }
 
-std::vector<MegaTransfer *> MegaCmdGlobalTransferListener::getCompletedTransfers(
+std::vector<std::unique_ptr<MegaTransfer>> MegaCmdGlobalTransferListener::getCompletedTransfers(
         size_t max, const std::function<bool(const MegaTransfer &)> &accept)
 {
-    std::vector<MegaTransfer *> selected;
+    std::vector<std::unique_ptr<MegaTransfer>> selected;
 
     std::lock_guard<std::mutex> g(completedTransfersMutex);
     for (const auto &transfer : completedTransfers)
@@ -1230,7 +1230,7 @@ std::vector<MegaTransfer *> MegaCmdGlobalTransferListener::getCompletedTransfers
         }
         if (accept(*transfer))
         {
-            selected.push_back(transfer.get());
+            selected.emplace_back(transfer->copy());
         }
     }
     return selected;

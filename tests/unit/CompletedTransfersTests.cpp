@@ -75,7 +75,7 @@ TEST(CompletedTransfers, readerGetsValidTransfersWhileOldOnesAreEvicted)
         listener.addCompletedTransfer(std::make_unique<FakeTransfer>(), std::nullopt);
     }
 
-    for (MegaTransfer *transfer : toPrint)
+    for (const auto &transfer : toPrint)
     {
         EXPECT_EQ(transfer->getType(), MegaTransfer::TYPE_UPLOAD);
     }
