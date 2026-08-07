@@ -2572,6 +2572,7 @@ string getHelpStr(const char *command, const HelpFlags& flags = {})
         os << "Configures a WEBDAV server to serve a location in MEGA" << endl;
         os << endl;
         os << "This can also be used for streaming files. The server will be running as long as MEGAcmd Server is." << endl;
+        os << "The on-disk cache used for streaming can be tuned with the \"" << getCommandPrefixBasedOnMode() << "configure\" command (see the file_service_reclaim_* keys)." << endl;
         os << "If no argument is given, it will list the webdav enabled locations." << endl;
         os << endl;
         os << "Options:" << endl;
@@ -2601,6 +2602,7 @@ string getHelpStr(const char *command, const HelpFlags& flags = {})
         os << "Configures a FTP server to serve a location in MEGA" << endl;
         os << endl;
         os << "This can also be used for streaming files. The server will be running as long as MEGAcmd Server is." << endl;
+        os << "The on-disk cache used for streaming can be tuned with the \"" << getCommandPrefixBasedOnMode() << "configure\" command (see the file_service_reclaim_* keys)." << endl;
         os << "If no argument is given, it will list the ftp enabled locations." << endl;
         os << endl;
         os << "Options:" << endl;
@@ -2778,11 +2780,21 @@ string getHelpStr(const char *command, const HelpFlags& flags = {})
         os << "If a key and value are provided, it will set the value of that key." << endl;
         os << endl;
         os << "Possible keys:" << endl;
+        unsigned int keyWidth = 23;
         for (auto &vc : Instance<ConfiguratorMegaApiHelper>::Get().getConfigurators())
         {
-            os << " - " << getFixLengthString(vc.mKey, 23) << " " << vc.mDescription << "."  << endl;
-            os << wrapText(vc.mFullDescription, 120 - 27 - 1, 27) << endl;
+            keyWidth = std::max<unsigned int>(keyWidth, static_cast<unsigned int>(vc.mKey.size()));
         }
+        const int descIndent = static_cast<int>(keyWidth) + 4;
+        for (auto &vc : Instance<ConfiguratorMegaApiHelper>::Get().getConfigurators())
+        {
+            os << " - " << getFixLengthString(vc.mKey, keyWidth) << " " << vc.mDescription << "."  << endl;
+            os << wrapText(vc.mFullDescription, 120 - descIndent - 1, descIndent) << endl;
+        }
+        os << endl;
+        os << "The file_service_reclaim_* keys tune the on-disk cache used by the streaming (ftp/webdav) file services." << endl;
+        os << "They are applied to the file service on each login. A change made while logged in takes effect immediately;" << endl;
+        os << "changing file_service_reclaim_delay re-arms the next reclaim to run that many seconds from when the change is applied." << endl;
     }
     else if (!strcmp(command, "backup"))
     {
