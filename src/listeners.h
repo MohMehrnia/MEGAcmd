@@ -289,6 +289,10 @@ public:
     MegaCmdGlobalTransferListener(mega::MegaApi *megaApi, MegaCmdSandbox *sandboxCMD, mega::MegaTransferListener *parent = NULL);
     virtual ~MegaCmdGlobalTransferListener();
 
+    // Takes ownership of transfer. Stores it, evicting (and deleting) the oldest
+    // one if the buffer is full. An empty nodePath means no path is known for it.
+    void addCompletedTransfer(mega::MegaTransfer *transfer, const std::string &nodePath);
+
     //Transfer callbacks
     void onTransferFinish(mega::MegaApi* api, mega::MegaTransfer *transfer, mega::MegaError* error);
     void onTransferTemporaryError(mega::MegaApi *api, mega::MegaTransfer *transfer, mega::MegaError* e);
