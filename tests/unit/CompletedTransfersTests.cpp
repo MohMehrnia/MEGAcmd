@@ -13,6 +13,8 @@
  * program.
  */
 
+#include <memory>
+#include <optional>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -41,13 +43,14 @@ size_t fillCompletedBuffer(MegaCmdGlobalTransferListener &listener)
     size_t capacity = 0;
     while (true)
     {
-        listener.addCompletedTransfer(new FakeTransfer(), "");
+        listener.addCompletedTransfer(std::make_unique<FakeTransfer>(), std::nullopt);
 
-        if (listener.completedTransfers.size() == capacity)
+        const size_t count = listener.getCompletedTransfersCount();
+        if (count == capacity)
         {
             return capacity;
         }
-        capacity = listener.completedTransfers.size();
+        capacity = count;
     }
 }
 
@@ -65,17 +68,11 @@ TEST(CompletedTransfers, readerGetsValidTransfersWhileOldOnesAreEvicted)
     const size_t capacity = fillCompletedBuffer(listener);
     ASSERT_GT(capacity, evictions);
 
-    std::vector<MegaTransfer *> toPrint;
-    listener.completedTransfersMutex.lock();
-    for (MegaTransfer *transfer : listener.completedTransfers)
-    {
-        toPrint.push_back(transfer);
-    }
-    listener.completedTransfersMutex.unlock();
+    auto toPrint = listener.getCompletedTransfers(capacity, [](const MegaTransfer &) { return true; });
 
     for (int i = 0; i < evictions; ++i)
     {
-        listener.addCompletedTransfer(new FakeTransfer(), "");
+        listener.addCompletedTransfer(std::make_unique<FakeTransfer>(), std::nullopt);
     }
 
     for (MegaTransfer *transfer : toPrint)

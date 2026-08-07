@@ -4325,9 +4325,7 @@ void MegaCmdExecuter::printTransfer(MegaTransfer *transfer, const unsigned int P
         }
         else
         {
-            globalTransferListener->completedTransfersMutex.lock();
-            OUTSTREAM << getFixLengthString(globalTransferListener->completedPathsByHandle[transfer->getNodeHandle()],PATHSIZE);
-            globalTransferListener->completedTransfersMutex.unlock();
+            OUTSTREAM << getFixLengthString(globalTransferListener->getCompletedPath(transfer->getNodeHandle()),PATHSIZE);
         }
 
         OUTSTREAM << " ";
@@ -4433,9 +4431,7 @@ void MegaCmdExecuter::printTransferColumnDisplayer(ColumnDisplayer *cd, MegaTran
         }
         else
         {
-            globalTransferListener->completedTransfersMutex.lock();
-            cd->addValue("SOURCEPATH",globalTransferListener->completedPathsByHandle[transfer->getNodeHandle()]);
-            globalTransferListener->completedTransfersMutex.unlock();
+            cd->addValue("SOURCEPATH",globalTransferListener->getCompletedPath(transfer->getNodeHandle()));
         }
 
         //destination
@@ -10657,7 +10653,7 @@ void MegaCmdExecuter::executecommand(vector<string> words, map<string, int> *clf
 
 
 
-        int limit = getintOption(cloptions, "limit", min(10,ndownloads+nuploads+(int)globalTransferListener->completedTransfers.size()));
+        int limit = getintOption(cloptions, "limit", min(10,ndownloads+nuploads+(int)globalTransferListener->getCompletedTransfersCount()));
 
         if (!transferdata)
         {
@@ -10683,28 +10679,20 @@ void MegaCmdExecuter::executecommand(vector<string> words, map<string, int> *clf
 
         if (showcompleted)
         {
-            globalTransferListener->completedTransfersMutex.lock();
-            size_t totalcompleted = globalTransferListener->completedTransfers.size();
-            for (size_t i = 0;(i < totalcompleted)
-                 && (shownCompleted < totalcompleted)
-                 && (shownCompleted < (size_t)(limit+1)); //Note limit+1 to seek for one more to show if there are more to show!
-                 i++)
+            auto accept = [onlyuploads, onlydownloads, showsyncs](const MegaTransfer &transfer)
             {
-                MegaTransfer *transfer = globalTransferListener->completedTransfers.at(i);
-                if (
-                    (
-                            (transfer->getType() == MegaTransfer::TYPE_UPLOAD && (onlyuploads || (!onlyuploads && !onlydownloads) ))
-                        ||  (transfer->getType() == MegaTransfer::TYPE_DOWNLOAD && (onlydownloads || (!onlyuploads && !onlydownloads) ) )
-                    )
-                    &&  !(!showsyncs && transfer->isSyncTransfer())
-                    )
-                {
+                return (
+                        (
+                                (transfer.getType() == MegaTransfer::TYPE_UPLOAD && (onlyuploads || (!onlyuploads && !onlydownloads) ))
+                            ||  (transfer.getType() == MegaTransfer::TYPE_DOWNLOAD && (onlydownloads || (!onlyuploads && !onlydownloads) ) )
+                        )
+                        &&  !(!showsyncs && transfer.isSyncTransfer())
+                        );
+            };
 
-                    transfersCompletedToShow.push_back(transfer);
-                    shownCompleted++;
-                }
-            }
-            globalTransferListener->completedTransfersMutex.unlock();
+            //Note limit+1 to seek for one more to show if there are more to show!
+            transfersCompletedToShow = globalTransferListener->getCompletedTransfers((size_t)(limit+1), accept);
+            shownCompleted = (unsigned int)transfersCompletedToShow.size();
         }
 
         shown += shownCompleted;
