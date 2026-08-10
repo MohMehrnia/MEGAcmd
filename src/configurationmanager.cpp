@@ -1103,12 +1103,12 @@ ConfiguratorMegaApiHelper::ConfiguratorMegaApiHelper()
 
     // Defaults applied on every login; used both as the getter fallback and in the help text,
     // so the value pushed to the SDK and the value the help shows cannot drift apart.
-    constexpr const char defaultReclaimAgeThreshold[] = "4320";    // minutes (3 days)
-    constexpr const char defaultReclaimBatchSize[] = "4";          // files
-    constexpr const char defaultReclaimDelay[] = "60";             // seconds
-    constexpr const char defaultReclaimPeriod[] = "7200";          // seconds (2 hours)
-    constexpr const char defaultReclaimThreshold[] = "5368709120"; // bytes (5 GiB)
-    constexpr const char defaultReclaimTarget[] = "1073741824";    // bytes (1 GiB)
+    constexpr const char defaultReclaimAgeThreshold[] = "4320";     // minutes (3 days)
+    constexpr const char defaultReclaimBatchSize[] = "4";           // files
+    constexpr const char defaultReclaimDelay[] = "1800";            // seconds (30 minutes)
+    constexpr const char defaultReclaimPeriod[] = "7200";           // seconds (2 hours)
+    constexpr const char defaultReclaimThreshold[] = "10737418240"; // bytes (10 GiB)
+    constexpr const char defaultReclaimTarget[] = "1073741824";     // bytes (1 GiB)
 
     mConfigurators.emplace_back("max_nodes_in_cache", "Max nodes loaded in memory",
                                 "This controls the number of nodes that the SDK stores in memory.",
@@ -1129,10 +1129,12 @@ ConfiguratorMegaApiHelper::ConfiguratorMegaApiHelper()
     // (ftp/webdav) and, in the future, FUSE. MEGAcmd deliberately pushes these defaults to the
     // SDK on every login (see the login-apply loop in MegaCmdExecuter::actUponLogin): the SDK
     // ships with reclamation disabled, so forcing a threshold here is what bounds the cache out
-    // of the box. age/batch/period happen to match the SDK's own defaults; threshold (SDK:
-    // disabled), target (SDK: 0) and delay (SDK: 1800) are deliberate MEGAcmd choices.
+    // of the box. The six values are the ones MEGAsync installs, so both desktop apps bound the
+    // cache the same way; age/batch/delay/period also match the SDK's own defaults, while
+    // threshold (SDK: disabled) and target (SDK: 0) are deliberate choices.
     mConfigurators.emplace_back("file_service_reclaim_age_threshold", "File-service cache cleanup: minimum file age in minutes",
-                                std::string("A cached file is only removed after going unaccessed for this many minutes. Default ") +
+                                std::string("A cached file is only removed after going unaccessed for this many minutes, so this is what "
+                                "decides how much a cleanup can actually free. Default ") +
                                 defaultReclaimAgeThreshold + " (3 days).",
                                 reclaimSetter([](MegaFileServiceReclaimOptions &options, unsigned long long value){ options.setAgeThreshold(static_cast<int>(value)); }),
                                 confGetterOr(defaultReclaimAgeThreshold),
@@ -1149,7 +1151,8 @@ ConfiguratorMegaApiHelper::ConfiguratorMegaApiHelper()
 
     mConfigurators.emplace_back("file_service_reclaim_delay", "File-service cache cleanup: seconds before the first cleanup",
                                 std::string("How long (in seconds) to wait before the first cleanup. The wait restarts on login/startup "
-                                "and whenever any file_service_reclaim_* value is changed. Default ") + defaultReclaimDelay + ".",
+                                "and whenever any file_service_reclaim_* value is changed. Default ") +
+                                defaultReclaimDelay + " (30 minutes).",
                                 reclaimSetter([](MegaFileServiceReclaimOptions &options, unsigned long long value){ options.setDelay(value); }),
                                 confGetterOr(defaultReclaimDelay),
                                 std::nullopt/*megaApiGetter*/,
@@ -1164,8 +1167,10 @@ ConfiguratorMegaApiHelper::ConfiguratorMegaApiHelper()
                                 validatorULL(1, maxSeconds));
 
     mConfigurators.emplace_back("file_service_reclaim_threshold", "File-service cache cleanup: cache size in bytes that triggers a cleanup",
-                                std::string("When the cache grows past this many bytes, a cleanup can start. Use \"off\" to disable "
-                                "automatic cleanup, or 0 to let cleanups start at any cache size. Default ") + defaultReclaimThreshold + " (5 GiB).",
+                                std::string("A scheduled cleanup only does something while the cache is above this many bytes; it then "
+                                "removes old files until the cache is down to file_service_reclaim_target. Nothing prevents the cache "
+                                "from growing past this. Use \"off\" to disable automatic cleanup, or 0 to let cleanups run at any "
+                                "cache size. Default ") + defaultReclaimThreshold + " (10 GiB).",
                                 reclaimThresholdSetter,
                                 confGetterOr(defaultReclaimThreshold),
                                 std::nullopt/*megaApiGetter*/,
