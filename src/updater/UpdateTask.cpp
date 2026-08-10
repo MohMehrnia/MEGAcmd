@@ -648,11 +648,90 @@ string osversion()
 #endif
 
 
+#ifdef _WIN32
+// The GetVersion family reports a capped version to processes without a
+// supportedOS manifest, which makes Windows 8, 8.1, 10 and 11 indistinguishable.
+// ntdll answers with the real one.
+static string windowsVersion()
+{
+    typedef struct _MEGA_OSVERSIONINFOW
+    {
+        DWORD dwOSVersionInfoSize;
+        DWORD dwMajorVersion;
+        DWORD dwMinorVersion;
+        DWORD dwBuildNumber;
+        DWORD dwPlatformId;
+        WCHAR szCSDVersion[128];
+    } MEGA_OSVERSIONINFOW;
+
+    typedef LONG (WINAPI *RtlGetVersionPtr)(MEGA_OSVERSIONINFOW*);
+
+    MEGA_OSVERSIONINFOW version = {};
+    version.dwOSVersionInfoSize = sizeof(version);
+
+    if (HMODULE ntdll = GetModuleHandleW(L"ntdll.dll"))
+    {
+        if (auto rtlGetVersion = (RtlGetVersionPtr)(void*)GetProcAddress(ntdll, "RtlGetVersion"))
+        {
+            rtlGetVersion(&version);
+        }
+    }
+
+    char buf[64];
+    // "Windows NT" keeps the user agent within reach of the filters already
+    // deployed for the Windows versions no longer served
+    snprintf(buf, sizeof(buf), "Windows NT %lu.%lu.%lu",
+             version.dwMajorVersion, version.dwMinorVersion, version.dwBuildNumber);
+    return buf;
+}
+
+static string userAgent()
+{
+    char buf[128];
+    snprintf(buf, sizeof(buf), "%s/%d.%d.%d.%d (%s)",
+             USER_AGENT_APP_NAME,
+             MEGACMD_MAJOR_VERSION, MEGACMD_MINOR_VERSION,
+             MEGACMD_MICRO_VERSION, MEGACMD_BUILD_ID,
+             windowsVersion().c_str());
+    return buf;
+}
+
+// Without this, urlmon sends the user agent it inherits from Internet Explorer,
+// which carries no application and no reliable Windows version.
+static void setUserAgentOnce()
+{
+    static bool alreadySet = false;
+    if (alreadySet)
+    {
+        return;
+    }
+    alreadySet = true;
+
+    const string ua = userAgent();
+
+    // urlmon holds on to the agent it resolved first, so drop that before setting
+    // ours. The buffer is a narrow string and the length is in bytes.
+    UrlMkSetSessionOption(URLMON_OPTION_USERAGENT_REFRESH, nullptr, 0, 0);
+    const HRESULT res = UrlMkSetSessionOption(URLMON_OPTION_USERAGENT,
+                                             (LPVOID)ua.c_str(),
+                                             (DWORD)ua.size(), 0);
+    if (res != S_OK)
+    {
+        LOG(LOG_LEVEL_WARNING, "Unable to set the user agent. Error code: %ld", res);
+        return;
+    }
+
+    LOG(LOG_LEVEL_INFO, "User agent: %s", ua.c_str());
+}
+#endif
+
 bool UpdateTask::downloadFile(string url, string dstPath)
 {
     LOG(LOG_LEVEL_INFO, "Downloading updated file from: %s",  url.c_str());
 
 #ifdef _WIN32
+    setUserAgentOnce();
+
     string wurl;
     string wdstPath;
 
