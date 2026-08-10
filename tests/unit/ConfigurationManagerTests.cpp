@@ -1,5 +1,5 @@
 /**
- * (c) 2025 by Mega Limited, Auckland, New Zealand
+ * (c) 2026 by Mega Limited, Auckland, New Zealand
  *
  * This file is part of MEGAcmd.
  *

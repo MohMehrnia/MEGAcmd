@@ -1015,11 +1015,30 @@ ConfiguratorMegaApiHelper::ConfiguratorMegaApiHelper()
                 return false;
             }
             mutate(*options);
+
+            // A target above the threshold is legal for the SDK, but it means cleanups trigger and
+            // immediately stop without freeing space. Report it instead of rejecting the value: the
+            // user may be raising both and have set the target first. Logged at error level so it
+            // reaches the shell, which only relays errors unless the command is run with -v.
+            const auto threshold = options->getReclaimThreshold();
+            if (threshold > 0 && options->getReclaimTarget() > static_cast<uint64_t>(threshold))
+            {
+                LOG_err << "File-service cleanup target (" << options->getReclaimTarget()
+                        << " bytes) is above the threshold (" << threshold
+                        << " bytes); cleanups will start and stop without freeing space";
+            }
+
             api->fileServiceSetReclaimOptions(options.get());
             return true;
         }
+        catch (const std::exception &e)
+        {
+            LOG_err << "Failed to apply file-service reclaim options: " << e.what();
+            return false;
+        }
         catch (...)
         {
+            LOG_err << "Failed to apply file-service reclaim options: unknown exception";
             return false;
         }
     };
