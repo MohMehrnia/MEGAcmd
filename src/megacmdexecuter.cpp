@@ -5302,6 +5302,15 @@ void MegaCmdExecuter::addWebdavLocation(MegaNode *n, bool firstone, string name)
         {
             sendEvent(StatsManager::MegacmdEvent::FIRST_CONFIGURED_WEBDAV, api, false);
             ConfigurationManager::savePropertyValue("firstWebDavConfigured", true);
+
+            // Only in the shell: scripts parse the served URL out of standard output, so their
+            // output stays as it is.
+            if (isCurrentThreadInteractive())
+            {
+                OUTSTREAM << "Note: streaming over webdav caches file content on disk. See \""
+                          << "help --streaming\" for how that cache is cleaned up and for values"
+                          << " that keep it within a disk budget." << endl;
+            }
         }
         else if (std::find(servedpaths.begin(), servedpaths.end(), actualNodePath.get()) == servedpaths.end())
         {
@@ -5361,6 +5370,12 @@ void MegaCmdExecuter::addFtpLocation(MegaNode *n, bool firstone, string name)
         {
             sendEvent(StatsManager::MegacmdEvent::FIRST_CONFIGURED_FTP, api, false);
             ConfigurationManager::savePropertyValue("firstFtpConfigured", true);
+
+            // Only in the shell, for the same reason as in addWebDavLocation.
+            if (isCurrentThreadInteractive())
+            {
+                OUTSTREAM << "Note: see \"help --streaming\" for how streaming uses memory and disk." << endl;
+            }
         }
         else if (std::find(servedpaths.begin(), servedpaths.end(), actualNodePath.get()) == servedpaths.end())
         {
