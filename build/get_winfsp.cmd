@@ -13,8 +13,11 @@ if errorlevel 1 (
     echo ERROR: Download failed
     exit /b 1
 )
-for /f %%H in ('powershell -NoProfile -Command "(Get-FileHash -Algorithm SHA256 -Path '%FILENAME%').Hash.ToLowerInvariant()"') do set "ACTUAL_HASH=%%H"
-if "%ACTUAL_HASH%"=="" (
+set "ACTUAL_HASH="
+for /f %%H in ('sha256sum "%FILENAME%" 2^>nul') do set "ACTUAL_HASH=%%H"
+if not defined ACTUAL_HASH echo sha256sum unavailable, computing the checksum with PowerShell
+if not defined ACTUAL_HASH for /f %%H in ('powershell -NoProfile -Command "(Get-FileHash -Algorithm SHA256 -Path '%FILENAME%').Hash.ToLowerInvariant()"') do set "ACTUAL_HASH=%%H"
+if not defined ACTUAL_HASH (
     echo ERROR: Failed to compute SHA256 checksum
     exit /b 1
 )
