@@ -1245,7 +1245,8 @@ size_t MegaCmdGlobalTransferListener::getCompletedTransfersCount()
 std::string MegaCmdGlobalTransferListener::getCompletedPath(MegaHandle handle)
 {
     std::lock_guard<std::mutex> g(completedTransfersMutex);
-    return completedPathsByHandle[handle];
+    auto it = completedPathsByHandle.find(handle);
+    return it == completedPathsByHandle.end() ? std::string{} : it->second;
 }
 
 void MegaCmdGlobalTransferListener::onTransferFinish(MegaApi* api, MegaTransfer *transfer, MegaError* error)
