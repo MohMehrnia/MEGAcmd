@@ -63,7 +63,14 @@ VIAddVersionKey "ProductVersion" "${Expv_1}.${Expv_2}.${Expv_3}.${Expv_4}"
 !define PRODUCT_VERSION "${Expv_1}.${Expv_2}.${Expv_3}"
 !endif
 
-!define VcRedistBasePath "C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Redist\MSVC\14.42.34433"
+; The redistributable version follows the toolset that built the binaries, so it changes
+; whenever Visual Studio is updated. The build scripts pass VCREDISTDIR taken from the
+; environment; the fallback below is only for manual runs.
+!ifdef VCREDISTDIR
+!define VcRedistBasePath "${VCREDISTDIR}"
+!else
+!define VcRedistBasePath "C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Redist\MSVC\14.44.35207"
+!endif
 !define VcRedist32BasePath "${VcRedistBasePath}\x86"
 !define VcRedist32Path "${VcRedist32BasePath}\Microsoft.VC143.CRT"
 !define VcRedist64BasePath "${VcRedistBasePath}\x64"

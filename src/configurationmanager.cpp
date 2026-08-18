@@ -25,6 +25,11 @@
 #include "sync_ignore.h"
 
 #include <fstream>
+#include <algorithm>
+#include <cctype>
+#include <limits>
+#include <memory>
+#include <mutex>
 
 #ifndef ERRNO
 #ifdef _WIN32
@@ -937,33 +942,173 @@ ConfiguratorMegaApiHelper::ConfiguratorMegaApiHelper()
 
     auto confGetter = [](::mega::MegaApi */*api*/,const char *key){ return  ConfigurationManager::getConfigurationValueOpt<std::string>(key); };
 
-    auto validatorULL = [](std::optional<unsigned long long> minOpt = {}, std::optional<unsigned long long> maxOpt = {})
+    // Like confGetter, but falls back to a hardcoded default when the value is not persisted.
+    // The login-apply loop only applies a configurator whose getter returns a value, so using
+    // this fallback ensures MEGAcmd's chosen default is applied on every startup/login even
+    // when the user hasn't overridden it (values are wiped from the config on logout).
+    auto confGetterOr = [](std::string defaultValue)
     {
-        return [minOpt, maxOpt](const char *value){
-            if (value && value[0] == '-')
-            {
-                return false;
-            }
-
-            try
-            {
-                auto v = std::stoull(value);
-                if (maxOpt && v > *maxOpt)
-                {
-                    return false;
-                }
-                if (minOpt && v < *minOpt)
-                {
-                    return false;
-                }
-                return true;
-            }
-            catch (...)
-            {
-                return false;
-            }
+        return [defaultValue](::mega::MegaApi */*api*/, const char *key) -> std::optional<std::string>
+        {
+            auto value = ConfigurationManager::getConfigurationValueOpt<std::string>(key);
+            return value ? value : std::optional<std::string>(defaultValue);
         };
     };
+
+    // Strict base-10 parse: digits only. stoull alone skips leading whitespace and accepts a
+    // sign, silently wrapping negatives (e.g. " -1") to huge values.
+    auto parseULL = [](const char *value) -> std::optional<unsigned long long>
+    {
+        std::string str(value ? value : "");
+        if (str.empty() || str.find_first_not_of("0123456789") != std::string::npos)
+        {
+            return std::nullopt;
+        }
+        try
+        {
+            return std::stoull(str);
+        }
+        catch (...) // out_of_range
+        {
+            return std::nullopt;
+        }
+    };
+
+    auto validatorULL = [parseULL](std::optional<unsigned long long> minOpt = {}, std::optional<unsigned long long> maxOpt = {})
+    {
+        return [parseULL, minOpt, maxOpt](const char *value){
+            auto v = parseULL(value);
+            if (!v)
+            {
+                return false;
+            }
+            if (maxOpt && *v > *maxOpt)
+            {
+                return false;
+            }
+            if (minOpt && *v < *minOpt)
+            {
+                return false;
+            }
+            return true;
+        };
+    };
+
+    // Helpers for the MEGA file-service cache reclaim options. The SDK only exposes a
+    // set-the-whole-object API, so every setter fetches the current options, mutates a single
+    // field, and pushes the whole object back. Commands run on separate threads (and a login can
+    // be applying these setters in parallel), so the shared reclaimMutex makes each fetch-mutate-push
+    // atomic: without it two concurrent setters could both read the same snapshot and the second
+    // push would drop the first's field. The lock is only ever taken here, never from inside the
+    // SDK, so it cannot deadlock.
+    auto reclaimMutex = std::make_shared<std::mutex>();
+
+    // Fetch-mutate-push of the whole options object, under the shared mutex.
+    auto applyReclaimChange = [reclaimMutex](MegaApi *api, std::function<void(MegaFileServiceReclaimOptions &)> mutate)
+    {
+        try
+        {
+            std::lock_guard<std::mutex> guard(*reclaimMutex);
+            std::unique_ptr<MegaFileServiceReclaimOptions> options(api->fileServiceGetReclaimOptions());
+            if (!options)
+            {
+                return false;
+            }
+            mutate(*options);
+
+            // A target above the threshold is legal for the SDK, but it means cleanups trigger and
+            // immediately stop without freeing space. Report it instead of rejecting the value: the
+            // user may be raising both and have set the target first. Logged at error level so it
+            // reaches the shell, which only relays errors unless the command is run with -v.
+            const auto threshold = options->getReclaimThreshold();
+            if (threshold > 0 && options->getReclaimTarget() > static_cast<uint64_t>(threshold))
+            {
+                LOG_err << "File-service cleanup target (" << options->getReclaimTarget()
+                        << " bytes) is above the threshold (" << threshold
+                        << " bytes); cleanups will start and stop without freeing space";
+            }
+
+            api->fileServiceSetReclaimOptions(options.get());
+            return true;
+        }
+        catch (const std::exception &e)
+        {
+            LOG_err << "Failed to apply file-service reclaim options: " << e.what();
+            return false;
+        }
+        catch (...)
+        {
+            LOG_err << "Failed to apply file-service reclaim options: unknown exception";
+            return false;
+        }
+    };
+
+    auto reclaimSetter = [parseULL, applyReclaimChange](std::function<void(MegaFileServiceReclaimOptions &, unsigned long long)> apply)
+    {
+        return [parseULL, applyReclaimChange, apply](MegaApi *api, const std::string &/*name*/, const char *value)
+        {
+            auto parsed = parseULL(value);
+            if (!parsed)
+            {
+                return false;
+            }
+            return applyReclaimChange(api, [&apply, &parsed](MegaFileServiceReclaimOptions &options){ apply(options, *parsed); });
+        };
+    };
+
+    // The reclaim threshold is signed: -1 disables automatic reclamation, 0 means no minimum.
+    // A bare "-1" cannot be typed as a command argument (it is parsed as a flag), so the keyword
+    // "off" is the user-facing way to disable it.
+    auto parseReclaimThreshold = [](const char *value) -> std::optional<long long>
+    {
+        std::string str(value ? value : "");
+        std::transform(str.begin(), str.end(), str.begin(), [](unsigned char c){ return static_cast<char>(std::tolower(c)); });
+        if (str == "off" || str == "-1")
+        {
+            return -1;
+        }
+        if (str.empty() || str.find_first_not_of("0123456789") != std::string::npos)
+        {
+            return std::nullopt;
+        }
+        try
+        {
+            return std::stoll(str);
+        }
+        catch (...) // out_of_range
+        {
+            return std::nullopt;
+        }
+    };
+
+    auto reclaimThresholdSetter = [parseReclaimThreshold, applyReclaimChange](MegaApi *api, const std::string &/*name*/, const char *value)
+    {
+        auto parsed = parseReclaimThreshold(value);
+        if (!parsed)
+        {
+            return false;
+        }
+        return applyReclaimChange(api, [&parsed](MegaFileServiceReclaimOptions &options){ options.setReclaimThreshold(*parsed); });
+    };
+
+    auto reclaimThresholdValidator = [parseReclaimThreshold](const char *value)
+    {
+        return parseReclaimThreshold(value).has_value();
+    };
+
+    constexpr auto maxAgeThreshold = static_cast<unsigned long long>(std::numeric_limits<int>::max());
+
+    // Caps the seconds-based keys far below where the SDK's signed time arithmetic could overflow.
+    constexpr auto maxSeconds = static_cast<unsigned long long>(std::numeric_limits<int>::max());
+
+    // Defaults applied on every login; used both as the getter fallback and in the help text,
+    // so the value pushed to the SDK and the value the help shows cannot drift apart.
+    constexpr const char defaultReclaimAgeThreshold[] = "4320";     // minutes (3 days)
+    constexpr const char defaultReclaimBatchSize[] = "4";           // files
+    constexpr const char defaultReclaimDelay[] = "1800";            // seconds (30 minutes)
+    constexpr const char defaultReclaimPeriod[] = "7200";           // seconds (2 hours)
+    constexpr const char defaultReclaimThreshold[] = "10737418240"; // bytes (10 GiB)
+    constexpr const char defaultReclaimTarget[] = "1073741824";     // bytes (1 GiB)
 
     mConfigurators.emplace_back("max_nodes_in_cache", "Max nodes loaded in memory",
                                 "This controls the number of nodes that the SDK stores in memory.",
@@ -979,6 +1124,65 @@ ConfiguratorMegaApiHelper::ConfiguratorMegaApiHelper()
                                 confGetter,
                                 std::nullopt/*megaApiGetter*/,
                                 validatorULL(0, 20));
+
+    // File-service cache reclaim options. These tune the on-disk cache that backs streaming
+    // (ftp/webdav) and, in the future, FUSE. MEGAcmd deliberately pushes these defaults to the
+    // SDK on every login (see the login-apply loop in MegaCmdExecuter::actUponLogin): the SDK
+    // ships with reclamation disabled, so forcing a threshold here is what bounds the cache out
+    // of the box. The six values are the ones MEGAsync installs, so both desktop apps bound the
+    // cache the same way; age/batch/delay/period also match the SDK's own defaults, while
+    // threshold (SDK: disabled) and target (SDK: 0) are deliberate choices.
+    mConfigurators.emplace_back("file_service_reclaim_age_threshold", "File-service cache cleanup: minimum file age in minutes",
+                                std::string("A cached file is only removed after going unaccessed for this many minutes, so this is what "
+                                "decides how much a cleanup can actually free. Default ") +
+                                defaultReclaimAgeThreshold + " (3 days).",
+                                reclaimSetter([](MegaFileServiceReclaimOptions &options, unsigned long long value){ options.setAgeThreshold(static_cast<int>(value)); }),
+                                confGetterOr(defaultReclaimAgeThreshold),
+                                std::nullopt/*megaApiGetter*/,
+                                validatorULL(0, maxAgeThreshold));
+
+    mConfigurators.emplace_back("file_service_reclaim_batch_size", "File-service cache cleanup: files removed at a time",
+                                std::string("How many files each cleanup removes at a time. Rarely needs changing. Default ") +
+                                defaultReclaimBatchSize + ".",
+                                reclaimSetter([](MegaFileServiceReclaimOptions &options, unsigned long long value){ options.setBatchSize(static_cast<std::size_t>(value)); }),
+                                confGetterOr(defaultReclaimBatchSize),
+                                std::nullopt/*megaApiGetter*/,
+                                validatorULL(1, std::numeric_limits<std::size_t>::max()));
+
+    mConfigurators.emplace_back("file_service_reclaim_delay", "File-service cache cleanup: seconds before the first cleanup",
+                                std::string("How long (in seconds) to wait before the first cleanup. The wait restarts on login/startup "
+                                "and whenever any file_service_reclaim_* value is changed. Default ") +
+                                defaultReclaimDelay + " (30 minutes).",
+                                reclaimSetter([](MegaFileServiceReclaimOptions &options, unsigned long long value){ options.setDelay(value); }),
+                                confGetterOr(defaultReclaimDelay),
+                                std::nullopt/*megaApiGetter*/,
+                                validatorULL(0, maxSeconds));
+
+    mConfigurators.emplace_back("file_service_reclaim_period", "File-service cache cleanup: seconds between cleanups",
+                                std::string("How long (in seconds) to wait between one cleanup and the next. Default ") +
+                                defaultReclaimPeriod + " (2 hours).",
+                                reclaimSetter([](MegaFileServiceReclaimOptions &options, unsigned long long value){ options.setPeriod(value); }),
+                                confGetterOr(defaultReclaimPeriod),
+                                std::nullopt/*megaApiGetter*/,
+                                validatorULL(1, maxSeconds));
+
+    mConfigurators.emplace_back("file_service_reclaim_threshold", "File-service cache cleanup: cache size in bytes that triggers a cleanup",
+                                std::string("A scheduled cleanup only does something while the cache is above this many bytes; it then "
+                                "removes old files until the cache is down to file_service_reclaim_target. Nothing prevents the cache "
+                                "from growing past this. Use \"off\" to disable automatic cleanup, or 0 to let cleanups run at any "
+                                "cache size. Default ") + defaultReclaimThreshold + " (10 GiB).",
+                                reclaimThresholdSetter,
+                                confGetterOr(defaultReclaimThreshold),
+                                std::nullopt/*megaApiGetter*/,
+                                reclaimThresholdValidator);
+
+    mConfigurators.emplace_back("file_service_reclaim_target", "File-service cache cleanup: cache size in bytes left after a cleanup",
+                                std::string("The cache size (in bytes) a cleanup shrinks the cache down to. Default ") +
+                                defaultReclaimTarget + " (1 GiB).",
+                                reclaimSetter([](MegaFileServiceReclaimOptions &options, unsigned long long value){ options.setReclaimTarget(value); }),
+                                confGetterOr(defaultReclaimTarget),
+                                std::nullopt/*megaApiGetter*/,
+                                validatorULL(0));
 }
 
 const std::vector<ConfiguratorMegaApiHelper::ValueConfigurator> & ConfiguratorMegaApiHelper::getConfigurators()

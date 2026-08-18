@@ -25,6 +25,65 @@ webdav /path/to/myfile.mp4
 
 You will receive an URL that you can use in your favourite video player.
 
+## Streaming cache
+
+Content fetched while streaming over webdav is cached on disk, so seeking backwards or replaying a
+part you already watched is fast and does not download it again. The cache lives with the session:
+it is removed when you log out. Streaming over [ftp](FTP.md) does not use it; that path is served
+through memory.
+
+The cache is cleaned up automatically, and you can tune it through the `file_service_reclaim_*` keys
+of the `configure` command. `configure --help` describes each key, and `help --streaming` explains
+the mechanism from within MEGAcmd.
+
+### How the cleanup works
+
+A cleanup runs on a timer. The first one runs `file_service_reclaim_delay` seconds after login, or
+after any `file_service_reclaim_*` value is changed, and further ones every
+`file_service_reclaim_period` seconds.
+
+Each cleanup does nothing at all unless the cache is above `file_service_reclaim_threshold` bytes.
+When it is above, files that have gone unaccessed for at least `file_service_reclaim_age_threshold`
+minutes are removed, least recently used first, until the cache is down to
+`file_service_reclaim_target` bytes.
+
+The defaults are the same ones MEGAsync uses: a cleanup every 2 hours, triggered above 10 GiB,
+shrinking to 1 GiB, and only touching files unaccessed for 3 days.
+
+### The threshold is not a hard limit
+
+Nothing stops the cache growing past `file_service_reclaim_threshold`. It only decides whether the
+next scheduled cleanup does any work, and a cleanup can only remove files that are already old
+enough. So with the defaults, a long streaming session can hold much more than 10 GiB for as long as
+it keeps reading, because none of that content has been idle for 3 days yet.
+
+The value that actually limits how large the cache can get is `file_service_reclaim_age_threshold`.
+
+### Keeping disk usage down
+
+If you stream a lot and want the cache genuinely bounded, use a short age and a short period. For a
+budget of about 2 GiB:
+
+```
+configure file_service_reclaim_age_threshold 10
+configure file_service_reclaim_period 300
+configure file_service_reclaim_threshold 2147483648
+configure file_service_reclaim_target 536870912
+```
+
+That looks every 5 minutes and, above 2 GiB, drops back to 512 MiB everything untouched for the last
+10 minutes. A file you are streaming right now counts as accessed, so it is never removed
+mid-playback. The trade-off is that replaying something you watched a while ago downloads it again.
+
+Values are kept per account and are reapplied on each login. They are cleared on logout, which
+brings the defaults back.
+
+To disable automatic cleanup entirely:
+
+```
+configure file_service_reclaim_threshold off
+```
+
 ## Issues
 We have detected some issues with different software, when trying to save a file into a webdav served locations. Typically with software that creates temporary files. 
 We will keep on trying to circumvent those. 

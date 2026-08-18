@@ -31,6 +31,28 @@ IF [%MEGA_WIN_KITVER%]==[] (
 	SET MEGA_WIN_KITVER=10.0.22621.0
 )
 
+:: VC REDISTRIBUTABLE DLLS SHIPPED WITH THE INSTALLER: THEY MUST MATCH THE TOOLSET THAT
+:: BUILT THE BINARIES. TAKE THE PATH FROM THE DEVELOPER ENVIRONMENT WHEN THERE IS ONE,
+:: OTHERWISE ASK VSWHERE FOR THE INSTALLATION AND READ ITS DEFAULT REDISTRIBUTABLE VERSION
+SET "MEGA_VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+IF "%MEGA_VC_REDIST_DIR%" == "" (
+	SET "MEGA_VC_REDIST_DIR=%VCToolsRedistDir%"
+)
+IF "%MEGA_VC_REDIST_DIR%" == "" (
+	FOR /F "usebackq tokens=*" %%i IN (`"%MEGA_VSWHERE%" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) DO SET "MEGA_VS_PATH=%%i"
+)
+IF NOT "%MEGA_VS_PATH%" == "" (
+	FOR /F "usebackq tokens=*" %%v IN ("%MEGA_VS_PATH%\VC\Auxiliary\Build\Microsoft.VCRedistVersion.default.txt") DO SET "MEGA_VC_REDIST_DIR=%MEGA_VS_PATH%\VC\Redist\MSVC\%%v"
+)
+IF "%MEGA_VC_REDIST_DIR:~-1%" == "\" (
+	SET "MEGA_VC_REDIST_DIR=%MEGA_VC_REDIST_DIR:~0,-1%"
+)
+IF NOT EXIST "%MEGA_VC_REDIST_DIR%\x64\Microsoft.VC143.CRT\vcruntime140.dll" (
+	echo "Error: VC redistributable DLLs not found in %MEGA_VC_REDIST_DIR%, set MEGA_VC_REDIST_DIR to override"
+	exit 1 /b
+)
+echo "Info: taking VC redistributable DLLs from %MEGA_VC_REDIST_DIR%"
+
 :: CHECK ARCHITECTURE
 IF "%MEGA_ARCH%" EQU "64" (
 	echo "Info: Building x64 only"
