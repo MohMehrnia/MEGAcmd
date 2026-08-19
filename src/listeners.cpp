@@ -1199,29 +1199,72 @@ MegaCmdGlobalTransferListener::MegaCmdGlobalTransferListener(MegaApi *megaApi, M
     this->listener = parent;
 }
 
-void MegaCmdGlobalTransferListener::onTransferFinish(MegaApi* api, MegaTransfer *transfer, MegaError* error)
+void MegaCmdGlobalTransferListener::addCompletedTransfer(std::unique_ptr<MegaTransfer> transfer, const std::optional<std::string> &nodePath)
 {
-    completedTransfersMutex.lock();
-    completedTransfers.push_front(transfer->copy());
+    std::lock_guard<std::mutex> g(completedTransfersMutex);
 
-    // source
-    MegaNode * node = api->getNodeByHandle(transfer->getNodeHandle());
-    if (node)
+    if (nodePath)
     {
-        char * nodepath = api->getNodePath(node);
-        completedPathsByHandle[transfer->getNodeHandle()]=nodepath;
-        delete []nodepath;
-        delete node;
+        completedPathsByHandle[transfer->getNodeHandle()] = *nodePath;
     }
+    completedTransfers.push_front(std::move(transfer));
 
     if (completedTransfers.size()>MAXCOMPLETEDTRANSFERSBUFFER)
     {
-        MegaTransfer * todelete = completedTransfers.back();
-        completedPathsByHandle.erase(todelete->getNodeHandle()); //TODO: this can be potentially eliminate a handle that has been added twice
-        delete todelete;
+        completedPathsByHandle.erase(completedTransfers.back()->getNodeHandle()); //TODO: this can be potentially eliminate a handle that has been added twice
         completedTransfers.pop_back();
     }
-    completedTransfersMutex.unlock();
+}
+
+std::vector<std::unique_ptr<MegaTransfer>> MegaCmdGlobalTransferListener::getCompletedTransfers(
+        size_t max, const std::function<bool(const MegaTransfer &)> &accept)
+{
+    std::vector<std::unique_ptr<MegaTransfer>> selected;
+
+    std::lock_guard<std::mutex> g(completedTransfersMutex);
+    for (const auto &transfer : completedTransfers)
+    {
+        if (selected.size() >= max)
+        {
+            break;
+        }
+        if (accept(*transfer))
+        {
+            selected.emplace_back(transfer->copy());
+        }
+    }
+    return selected;
+}
+
+size_t MegaCmdGlobalTransferListener::getCompletedTransfersCount()
+{
+    std::lock_guard<std::mutex> g(completedTransfersMutex);
+    return completedTransfers.size();
+}
+
+std::string MegaCmdGlobalTransferListener::getCompletedPath(MegaHandle handle)
+{
+    std::lock_guard<std::mutex> g(completedTransfersMutex);
+    auto it = completedPathsByHandle.find(handle);
+    return it == completedPathsByHandle.end() ? std::string{} : it->second;
+}
+
+void MegaCmdGlobalTransferListener::onTransferFinish(MegaApi* api, MegaTransfer *transfer, MegaError* error)
+{
+    // source
+    std::optional<std::string> nodePath;
+
+    std::unique_ptr<MegaNode> node(api->getNodeByHandle(transfer->getNodeHandle()));
+    if (node)
+    {
+        std::unique_ptr<char[]> path(api->getNodePath(node.get()));
+        if (path)
+        {
+            nodePath = path.get();
+        }
+    }
+
+    addCompletedTransfer(std::unique_ptr<MegaTransfer>(transfer->copy()), nodePath);
 }
 
 void MegaCmdGlobalTransferListener::onTransferTemporaryError(MegaApi *api, MegaTransfer *transfer, MegaError* e)
@@ -1243,17 +1286,6 @@ void MegaCmdGlobalTransferListener::onTransferTemporaryError(MegaApi *api, MegaT
 }
 
 bool MegaCmdGlobalTransferListener::onTransferData(MegaApi *api, MegaTransfer *transfer, char *buffer, size_t size) {return false;};
-
-MegaCmdGlobalTransferListener::~MegaCmdGlobalTransferListener()
-{
-    completedTransfersMutex.lock();
-    while (completedTransfers.size())
-    {
-        delete completedTransfers.front();
-        completedTransfers.pop_front();
-    }
-    completedTransfersMutex.unlock();
-}
 
 bool MegaCmdCatTransferListener::onTransferData(MegaApi *api, MegaTransfer *transfer, char *buffer, size_t size)
 {
