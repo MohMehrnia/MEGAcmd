@@ -2663,7 +2663,6 @@ int MegaCmdExecuter::actUponLogin(SynchronousRequestListener *srl, int timeout)
             }
         }
 
-        api->useHttpsOnly(ConfigurationManager::getConfigurationValue("https", false));
         api->disableGfxFeatures(!ConfigurationManager::getConfigurationValue("graphics", true));
 
 #ifndef _WIN32
@@ -7304,30 +7303,20 @@ void MegaCmdExecuter::executecommand(vector<string> words, map<string, int> *clf
     }
     else if (words[0] == "https")
     {
-        if (words.size() > 1 && (words[1] == "on" || words[1] == "off"))
+        if (words.size() > 1 && words[1] == "off")
         {
-            bool onlyhttps = words[1] == "on";
-            MegaCmdListener *megaCmdListener = new MegaCmdListener(NULL);
-            api->useHttpsOnly(onlyhttps,megaCmdListener);
-            megaCmdListener->wait();
-            if (checkNoErrors(megaCmdListener->getError(), "change https"))
-            {
-                OUTSTREAM << "File transfer now uses " << (api->usingHttpsOnly()?"HTTPS":"HTTP") << endl;
-                ConfigurationManager::savePropertyValue("https", api->usingHttpsOnly());
-            }
-            delete megaCmdListener;
+            setCurrentThreadOutCode(MCMD_NOTPERMITTED);
+            LOG_err << "HTTPS cannot be turned off: file transfers always use HTTPS";
             return;
         }
-        else if (words.size() > 1)
+        else if (words.size() > 1 && words[1] != "on")
         {
             setCurrentThreadOutCode(MCMD_EARGS);
             LOG_err << "      " << getUsageStr("https");
             return;
         }
-        else
-        {
-            OUTSTREAM << "File transfer is done using " << (api->usingHttpsOnly()?"HTTPS":"HTTP") << endl;
-        }
+
+        OUTSTREAM << "File transfer is done using HTTPS" << endl;
         return;
     }
     else if (words[0] == "graphics")
