@@ -1,10 +1,11 @@
 ### https
-Shows if HTTPS is used for transfers. Use "https on" to enable it.
+Shows that file transfers use HTTPS.
 
-Usage: `https [on|off]`
+Usage: `https [on]`
 <pre>
-HTTPS is not necessary since all data is stored and transferred encrypted.
-Enabling it will increase CPU usage and add network overhead.
+File transfers always use HTTPS. This can no longer be turned off.
 
-Notice that this setting will be saved for the next time you open MEGAcmd, but will be removed if you logout.
+"https on" is accepted and changes nothing. "https off" is rejected.
+
+This command is DEPRECATED.
 </pre>

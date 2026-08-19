@@ -1844,7 +1844,7 @@ const char * getUsageStr(const char *command, const HelpFlags& flags)
     }
     if (!strcmp(command, "https"))
     {
-        return "https [on|off]";
+        return "https [on]";
     }
     if ((!flags.win || flags.showAll) && !strcmp(command, "permissions"))
     {
@@ -2541,12 +2541,13 @@ string getHelpStr(const char *command, const HelpFlags& flags = {})
     }
     else if (!strcmp(command, "https"))
     {
-        os << "Shows if HTTPS is used for transfers. Use \"https on\" to enable it." << endl;
+        os << "Shows that file transfers use HTTPS." << endl;
         os << endl;
-        os << "HTTPS is not necessary since all data is stored and transferred encrypted." << endl;
-        os << "Enabling it will increase CPU usage and add network overhead." << endl;
+        os << "File transfers always use HTTPS. This can no longer be turned off." << endl;
         os << endl;
-        os << "Notice that this setting will be saved for the next time you open MEGAcmd, but will be removed if you logout." << endl;
+        os << "\"https on\" is accepted and changes nothing. \"https off\" is rejected." << endl;
+        os << endl;
+        os << "This command is DEPRECATED." << endl;
     }
     else if (!strcmp(command, "deleteversions"))
     {
