@@ -48,7 +48,7 @@ The major features are
 * Use those same commands in scripts to manage your files.
 * Set up synchronization or a backup schedule between a folder on your machine, and a folder on your MEGA account.   (use the [`sync`](#moving-copying-files) or [`backup`](#moving-copying-files) commands).
 * Set up WebDAV access to files in your MEGA account (use the [`webdav`](#webdav) command).
-* [Linux only] Set up a FUSE mount point to seamlessly access files in your MEGA account (use the [`fuse-add`](#fuse-mount-your-cloud-folder-to-the-local-system) command).
+* [Linux and Windows] Set up a FUSE mount point to seamlessly access files in your MEGA account (use the [`fuse-add`](#fuse-mount-your-cloud-folder-to-the-local-system) command).
 
 See our Help Centre pages for the basics of getting started, and friendly examples of common usages with plenty of pictures:  https://mega.nz/help
 
@@ -118,7 +118,7 @@ MEGAcmd can set up access to folders or files in your MEGA account as if they we
 For further information on WebDAV, please see the [`webdav`](#webdav) command and the [tutorial](WEBDAV.md
 
 ### FUSE mount point
-If you use Linux, MEGAcmd can set up access to folders or files in your MEGA account as if they were local folders and files on your device using Filesystem in User Space via [`fuse-add`](#fuse-mount-your-cloud-folder-to-the-local-system) command.
+On Linux and Windows, MEGAcmd can set up access to folders or files in your MEGA account as if they were local folders and files on your device using Filesystem in User Space via [`fuse-add`](#fuse-mount-your-cloud-folder-to-the-local-system) command. It is not available on macOS.
 
 For further information on FUSE, please see the [`fuse-add`](#fuse-mount-your-cloud-folder-to-the-local-system) command and the [tutorial](FUSE.md).
 
