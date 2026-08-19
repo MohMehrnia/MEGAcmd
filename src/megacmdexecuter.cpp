@@ -7331,7 +7331,7 @@ void MegaCmdExecuter::executecommand(vector<string> words, map<string, int> *clf
         else if (words.size() > 1)
         {
             setCurrentThreadOutCode(MCMD_EARGS);
-            LOG_err << "      " << getUsageStr("https");
+            LOG_err << "      " << getUsageStr("graphics");
             return;
         }
 
