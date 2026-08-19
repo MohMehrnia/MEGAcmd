@@ -2,7 +2,8 @@
 
 ##
  # @file build/update_changelogs.sh
- # @brief Updates debian.changelog and megacmd.changes for the current version.
+ # @brief Updates debian.changelog, megacmd.changes and the GitHub bug report
+ #        template for the current version.
  #        Run from the build/ directory before a release.
  #
 ##
@@ -16,6 +17,9 @@ BASEPATH=$SCRIPT_DIR/../
 megacmd_VERSION=$(grep -Po "MEGACMD_.*_VERSION [0-9]*" "$BASEPATH/CMakeLists.txt" | awk '{print $2}' | paste -sd '.')
 
 echo "MEGAcmd version: $megacmd_VERSION"
+
+# Offer this version to bug reporters
+./update_issue_template.sh "$megacmd_VERSION"
 
 # Read the last version for which changelogs were generated
 version_file="version"
