@@ -10,8 +10,8 @@ execute_process(
 )
 
 set(MEGACMD_MAJOR_VERSION 2)
-set(MEGACMD_MINOR_VERSION 5)
-set(MEGACMD_MICRO_VERSION 2)
+set(MEGACMD_MINOR_VERSION 6)
+set(MEGACMD_MICRO_VERSION 0)
 
 ## Configure megacmdversion.h
 configure_file("${CMAKE_CURRENT_LIST_DIR}/src/megacmdversion.h.in" "${CMAKE_CURRENT_LIST_DIR}/src/megacmdversion.h" @ONLY)
@@ -353,7 +353,9 @@ if (ENABLE_MEGACMD_TESTS)
     #Unit tests:
     add_executable(mega-cmd-tests-unit ${executablesType})
     add_source_and_corresponding_header_to_target(mega-cmd-tests-unit PRIVATE
+        "${ProjectDir}/tests/unit/CompletedTransfersTests.cpp"
         "${ProjectDir}/tests/unit/ComunicationsManagerFileSocketsTests.cpp"
+        "${ProjectDir}/tests/unit/ConfigurationManagerTests.cpp"
         "${ProjectDir}/tests/unit/OptionsFlagsUtilsTests.cpp"
         "${ProjectDir}/tests/unit/PlatformDirectoriesTests.cpp"
         "${ProjectDir}/tests/unit/StringUtilsTests.cpp"

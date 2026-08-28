@@ -3,7 +3,7 @@
 
 
 const char CLIENT_KEY[] = "BdARkQSQ";
-const char USER_AGENT[] = "MEGA/MEGAcmdUpdaterTask";
+const char USER_AGENT_APP_NAME[] = "MEGAcmd";
 
 #ifdef _WIN32
     #ifdef _WIN64

@@ -22,6 +22,11 @@
 #include "megacmdlogger.h"
 #include "megacmdsandbox.h"
 
+#include <functional>
+#include <memory>
+#include <optional>
+#include <vector>
+
 namespace megacmd {
 class MegaCmdSandbox;
 
@@ -281,13 +286,27 @@ private:
     MegaCmdSandbox *sandboxCMD;
     static const int MAXCOMPLETEDTRANSFERSBUFFER;
 
-public:
+    // The completed transfers are owned by this listener and are freed when evicted
+    // from the buffer. Nothing outside these methods may hold a pointer to them.
     std::mutex completedTransfersMutex;
-    std::deque<mega::MegaTransfer *> completedTransfers;
+    std::deque<std::unique_ptr<mega::MegaTransfer>> completedTransfers;
     std::map<mega::MegaHandle,std::string> completedPathsByHandle;
+
 public:
     MegaCmdGlobalTransferListener(mega::MegaApi *megaApi, MegaCmdSandbox *sandboxCMD, mega::MegaTransferListener *parent = NULL);
-    virtual ~MegaCmdGlobalTransferListener();
+    ~MegaCmdGlobalTransferListener() override = default;
+
+    // Stores a finished transfer, evicting the oldest one if the buffer is full.
+    void addCompletedTransfer(std::unique_ptr<mega::MegaTransfer> transfer, const std::optional<std::string> &nodePath);
+
+    // Returns up to `max` accepted completed transfers, newest first. The caller
+    // gets its own copies, so they stay valid however the buffer evolves.
+    std::vector<std::unique_ptr<mega::MegaTransfer>> getCompletedTransfers(
+            size_t max, const std::function<bool(const mega::MegaTransfer &)> &accept);
+
+    size_t getCompletedTransfersCount();
+
+    std::string getCompletedPath(mega::MegaHandle handle);
 
     //Transfer callbacks
     void onTransferFinish(mega::MegaApi* api, mega::MegaTransfer *transfer, mega::MegaError* error);

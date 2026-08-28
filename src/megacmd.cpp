@@ -42,6 +42,7 @@
 #define USE_VARARGS
 #define PREFER_STDARG
 
+#include <algorithm>
 #include <iomanip>
 #include <string>
 #include <deque>
@@ -484,6 +485,7 @@ void insertValidParamsPerCommand(set<string> *validParams, string thecommand, se
         validParams->insert("non-interactive");
         validParams->insert("upgrade");
         validParams->insert("paths");
+        validParams->insert("streaming");
         validParams->insert("show-all-options");
 #ifdef _WIN32
         validParams->insert("unicode");
@@ -1842,7 +1844,7 @@ const char * getUsageStr(const char *command, const HelpFlags& flags)
     }
     if (!strcmp(command, "https"))
     {
-        return "https [on|off]";
+        return "https [on]";
     }
     if ((!flags.win || flags.showAll) && !strcmp(command, "permissions"))
     {
@@ -2026,7 +2028,7 @@ const char * getUsageStr(const char *command, const HelpFlags& flags)
     }
     if (!strcmp(command, "help"))
     {
-        return "help [-f|-ff|--non-interactive|--upgrade|--paths] [--show-all-options]";
+        return "help [-f|-ff|--non-interactive|--upgrade|--paths|--streaming] [--show-all-options]";
     }
     if (!strcmp(command, "clear"))
     {
@@ -2228,6 +2230,7 @@ string getHelpStr(const char *command, const HelpFlags& flags = {})
         os << " --non-interactive" << "  " << "Display information on how to use MEGAcmd with scripts" << endl;
         os << " --upgrade" << "          " << "Display information on PRO plans" << endl;
         os << " --paths" << "            " << "Show caveats of local and remote paths" << endl;
+        os << " --streaming" << "        " << "Explain how webdav/ftp streaming uses memory and disk" << endl;
         os << " --show-all-options" << " " << "Display all options regardless of platform" << endl;
     }
     else if (!strcmp(command, "history"))
@@ -2538,12 +2541,13 @@ string getHelpStr(const char *command, const HelpFlags& flags = {})
     }
     else if (!strcmp(command, "https"))
     {
-        os << "Shows if HTTPS is used for transfers. Use \"https on\" to enable it." << endl;
+        os << "Shows that file transfers use HTTPS." << endl;
         os << endl;
-        os << "HTTPS is not necessary since all data is stored and transferred encrypted." << endl;
-        os << "Enabling it will increase CPU usage and add network overhead." << endl;
+        os << "File transfers always use HTTPS. This can no longer be turned off." << endl;
         os << endl;
-        os << "Notice that this setting will be saved for the next time you open MEGAcmd, but will be removed if you logout." << endl;
+        os << "\"https on\" is accepted and changes nothing. \"https off\" is rejected." << endl;
+        os << endl;
+        os << "This command is DEPRECATED." << endl;
     }
     else if (!strcmp(command, "deleteversions"))
     {
@@ -2572,6 +2576,9 @@ string getHelpStr(const char *command, const HelpFlags& flags = {})
         os << "Configures a WEBDAV server to serve a location in MEGA" << endl;
         os << endl;
         os << "This can also be used for streaming files. The server will be running as long as MEGAcmd Server is." << endl;
+        os << "Streaming over webdav caches file content on disk. See \"" << getCommandPrefixBasedOnMode() << "help --streaming\" for how that cache is" << endl;
+        os << "cleaned up and how to keep it within a disk budget, or the tutorial at" << endl;
+        os << "https://github.com/meganz/MEGAcmd/blob/master/contrib/docs/WEBDAV.md" << endl;
         os << "If no argument is given, it will list the webdav enabled locations." << endl;
         os << endl;
         os << "Options:" << endl;
@@ -2601,6 +2608,7 @@ string getHelpStr(const char *command, const HelpFlags& flags = {})
         os << "Configures a FTP server to serve a location in MEGA" << endl;
         os << endl;
         os << "This can also be used for streaming files. The server will be running as long as MEGAcmd Server is." << endl;
+        os << "See \"" << getCommandPrefixBasedOnMode() << "help --streaming\" for how streaming uses memory and disk." << endl;
         os << "If no argument is given, it will list the ftp enabled locations." << endl;
         os << endl;
         os << "Options:" << endl;
@@ -2778,11 +2786,23 @@ string getHelpStr(const char *command, const HelpFlags& flags = {})
         os << "If a key and value are provided, it will set the value of that key." << endl;
         os << endl;
         os << "Possible keys:" << endl;
+        unsigned int keyWidth = 23;
         for (auto &vc : Instance<ConfiguratorMegaApiHelper>::Get().getConfigurators())
         {
-            os << " - " << getFixLengthString(vc.mKey, 23) << " " << vc.mDescription << "."  << endl;
-            os << wrapText(vc.mFullDescription, 120 - 27 - 1, 27) << endl;
+            keyWidth = std::max<unsigned int>(keyWidth, static_cast<unsigned int>(vc.mKey.size()));
         }
+        const int descIndent = static_cast<int>(keyWidth) + 4;
+        for (auto &vc : Instance<ConfiguratorMegaApiHelper>::Get().getConfigurators())
+        {
+            os << " - " << getFixLengthString(vc.mKey, keyWidth) << " " << vc.mDescription << "."  << endl;
+            os << wrapText(vc.mFullDescription, 120 - descIndent - 1, descIndent) << endl;
+        }
+        os << endl;
+        os << "The file_service_reclaim_* keys control the automatic cleanup of the on-disk cache that webdav" << endl;
+        os << "streaming writes to. Cleanups run on a timer, and each one only does something while the cache is" << endl;
+        os << "above file_service_reclaim_threshold, so that threshold bounds nothing on its own." << endl;
+        os << "Changes take effect immediately and are re-applied on each login." << endl;
+        os << "For how the cleanup works and for values that keep heavy streaming within a disk budget, see \"" << getCommandPrefixBasedOnMode() << "help --streaming\"." << endl;
     }
     else if (!strcmp(command, "backup"))
     {
@@ -3648,6 +3668,48 @@ void executecommand(const char* ptr)
             OUTSTREAM << endl;
             OUTSTREAM << "USE autocompletion! MEGAcmd features autocompletion. Pressing <TAB> will autocomplete paths" << endl;
             OUTSTREAM << " (both LOCAL & REMOTE) along with other parameters of commands. It will surely save you some typing!" << endl;
+        }
+        else if (getFlag(&clflags,"streaming"))
+        {
+            const auto prefix = getCommandPrefixBasedOnMode();
+
+            OUTSTREAM << "MEGAcmd can stream files straight from your cloud through the webdav and ftp servers" << endl;
+            OUTSTREAM << " (see \"" << prefix << "webdav --help\" and \"" << prefix << "ftp --help\")." << endl;
+            OUTSTREAM << endl;
+            OUTSTREAM << "Where the data goes:" << endl;
+            OUTSTREAM << " - webdav: file content is cached on disk, so seeking back or replaying is fast. That cache" << endl;
+            OUTSTREAM << "    is what the file_service_reclaim_* keys of \"" << prefix << "configure\" control." << endl;
+            OUTSTREAM << " - ftp: served through memory, with no on-disk cache." << endl;
+            OUTSTREAM << " The cache lives with the session: it is removed when you log out." << endl;
+            OUTSTREAM << endl;
+            OUTSTREAM << "How the disk cache is cleaned up:" << endl;
+            OUTSTREAM << " A cleanup runs on a timer. The first one runs file_service_reclaim_delay seconds after login," << endl;
+            OUTSTREAM << " or after any file_service_reclaim_* value is changed, and further ones every" << endl;
+            OUTSTREAM << " file_service_reclaim_period seconds." << endl;
+            OUTSTREAM << " A cleanup does nothing at all unless the cache is above file_service_reclaim_threshold bytes." << endl;
+            OUTSTREAM << " When it is above, files that have gone unaccessed for at least" << endl;
+            OUTSTREAM << " file_service_reclaim_age_threshold minutes are removed, least recently used first, until the" << endl;
+            OUTSTREAM << " cache is down to file_service_reclaim_target bytes." << endl;
+            OUTSTREAM << endl;
+            OUTSTREAM << "The threshold is not a hard cap. Nothing stops the cache growing past it: it only decides" << endl;
+            OUTSTREAM << " whether the next scheduled cleanup does any work, and a cleanup can only remove files that" << endl;
+            OUTSTREAM << " are already old enough. With the shipped defaults (a cleanup every couple of hours, and only" << endl;
+            OUTSTREAM << " files unaccessed for days) a heavy streaming session can hold much more than the threshold," << endl;
+            OUTSTREAM << " for as long as it keeps reading. Run \"" << prefix << "configure\" to see the current values." << endl;
+            OUTSTREAM << endl;
+            OUTSTREAM << "Keeping disk usage down:" << endl;
+            OUTSTREAM << " If you stream a lot and want the cache actually bounded, use a short age and a short period." << endl;
+            OUTSTREAM << " For a budget of about 2 GiB:" << endl;
+            OUTSTREAM << "   " << prefix << "configure file_service_reclaim_age_threshold 10" << endl;
+            OUTSTREAM << "   " << prefix << "configure file_service_reclaim_period 300" << endl;
+            OUTSTREAM << "   " << prefix << "configure file_service_reclaim_threshold 2147483648" << endl;
+            OUTSTREAM << "   " << prefix << "configure file_service_reclaim_target 536870912" << endl;
+            OUTSTREAM << " That looks every 5 minutes and, above 2 GiB, drops back to 512 MiB everything untouched for" << endl;
+            OUTSTREAM << " the last 10 minutes. A file you are streaming right now counts as accessed, so it is never" << endl;
+            OUTSTREAM << " removed mid-playback. The trade-off is that replaying something you watched a while ago" << endl;
+            OUTSTREAM << " downloads it again." << endl;
+            OUTSTREAM << endl;
+            OUTSTREAM << "To disable automatic cleanup: " << prefix << "configure file_service_reclaim_threshold off" << endl;
         }
         else if (getFlag(&clflags,"non-interactive"))
         {

@@ -2663,7 +2663,6 @@ int MegaCmdExecuter::actUponLogin(SynchronousRequestListener *srl, int timeout)
             }
         }
 
-        api->useHttpsOnly(ConfigurationManager::getConfigurationValue("https", false));
         api->disableGfxFeatures(!ConfigurationManager::getConfigurationValue("graphics", true));
 
 #ifndef _WIN32
@@ -4325,9 +4324,7 @@ void MegaCmdExecuter::printTransfer(MegaTransfer *transfer, const unsigned int P
         }
         else
         {
-            globalTransferListener->completedTransfersMutex.lock();
-            OUTSTREAM << getFixLengthString(globalTransferListener->completedPathsByHandle[transfer->getNodeHandle()],PATHSIZE);
-            globalTransferListener->completedTransfersMutex.unlock();
+            OUTSTREAM << getFixLengthString(globalTransferListener->getCompletedPath(transfer->getNodeHandle()),PATHSIZE);
         }
 
         OUTSTREAM << " ";
@@ -4433,9 +4430,7 @@ void MegaCmdExecuter::printTransferColumnDisplayer(ColumnDisplayer *cd, MegaTran
         }
         else
         {
-            globalTransferListener->completedTransfersMutex.lock();
-            cd->addValue("SOURCEPATH",globalTransferListener->completedPathsByHandle[transfer->getNodeHandle()]);
-            globalTransferListener->completedTransfersMutex.unlock();
+            cd->addValue("SOURCEPATH",globalTransferListener->getCompletedPath(transfer->getNodeHandle()));
         }
 
         //destination
@@ -5302,6 +5297,15 @@ void MegaCmdExecuter::addWebdavLocation(MegaNode *n, bool firstone, string name)
         {
             sendEvent(StatsManager::MegacmdEvent::FIRST_CONFIGURED_WEBDAV, api, false);
             ConfigurationManager::savePropertyValue("firstWebDavConfigured", true);
+
+            // Only in the shell: scripts parse the served URL out of standard output, so their
+            // output stays as it is.
+            if (isCurrentThreadInteractive())
+            {
+                OUTSTREAM << "Note: streaming over webdav caches file content on disk. See \""
+                          << "help --streaming\" for how that cache is cleaned up and for values"
+                          << " that keep it within a disk budget." << endl;
+            }
         }
         else if (std::find(servedpaths.begin(), servedpaths.end(), actualNodePath.get()) == servedpaths.end())
         {
@@ -5361,6 +5365,12 @@ void MegaCmdExecuter::addFtpLocation(MegaNode *n, bool firstone, string name)
         {
             sendEvent(StatsManager::MegacmdEvent::FIRST_CONFIGURED_FTP, api, false);
             ConfigurationManager::savePropertyValue("firstFtpConfigured", true);
+
+            // Only in the shell, for the same reason as in addWebDavLocation.
+            if (isCurrentThreadInteractive())
+            {
+                OUTSTREAM << "Note: see \"help --streaming\" for how streaming uses memory and disk." << endl;
+            }
         }
         else if (std::find(servedpaths.begin(), servedpaths.end(), actualNodePath.get()) == servedpaths.end())
         {
@@ -5440,8 +5450,8 @@ void MegaCmdExecuter::printInfoFile(MegaNode *n, bool &firstone, int PATHSIZE)
     }
     else
     {
-        MediaProperties mp = MediaProperties::decodeMediaPropertiesAttributes(fattrs, (uint32_t*)(n->getNodeKey()->data() + FILENODEKEYLENGTH / 2) );
-        OUTSTREAM << getFixLengthString( (mp.fps == 0) ? "---" : SSTR(mp.fps) , 3) << " ";
+        auto mp = MediaProperties::decodeMediaPropertiesAttributes(fattrs, (uint32_t*)(n->getNodeKey()->data() + FILENODEKEYLENGTH / 2) );
+        OUTSTREAM << getFixLengthString( (!mp || mp->fps == 0) ? "---" : SSTR(mp->fps) , 3) << " ";
     }
     OUTSTREAM << getFixLengthString( (n->getDuration() == -1) ? "---" : getReadablePeriod(n->getDuration()) , 10) << " ";
 
@@ -7293,30 +7303,20 @@ void MegaCmdExecuter::executecommand(vector<string> words, map<string, int> *clf
     }
     else if (words[0] == "https")
     {
-        if (words.size() > 1 && (words[1] == "on" || words[1] == "off"))
+        if (words.size() > 1 && words[1] == "off")
         {
-            bool onlyhttps = words[1] == "on";
-            MegaCmdListener *megaCmdListener = new MegaCmdListener(NULL);
-            api->useHttpsOnly(onlyhttps,megaCmdListener);
-            megaCmdListener->wait();
-            if (checkNoErrors(megaCmdListener->getError(), "change https"))
-            {
-                OUTSTREAM << "File transfer now uses " << (api->usingHttpsOnly()?"HTTPS":"HTTP") << endl;
-                ConfigurationManager::savePropertyValue("https", api->usingHttpsOnly());
-            }
-            delete megaCmdListener;
+            setCurrentThreadOutCode(MCMD_NOTPERMITTED);
+            LOG_err << "HTTPS cannot be turned off: file transfers always use HTTPS";
             return;
         }
-        else if (words.size() > 1)
+        else if (words.size() > 1 && words[1] != "on")
         {
             setCurrentThreadOutCode(MCMD_EARGS);
             LOG_err << "      " << getUsageStr("https");
             return;
         }
-        else
-        {
-            OUTSTREAM << "File transfer is done using " << (api->usingHttpsOnly()?"HTTPS":"HTTP") << endl;
-        }
+
+        OUTSTREAM << "File transfer is done using HTTPS" << endl;
         return;
     }
     else if (words[0] == "graphics")
@@ -7331,7 +7331,7 @@ void MegaCmdExecuter::executecommand(vector<string> words, map<string, int> *clf
         else if (words.size() > 1)
         {
             setCurrentThreadOutCode(MCMD_EARGS);
-            LOG_err << "      " << getUsageStr("https");
+            LOG_err << "      " << getUsageStr("graphics");
             return;
         }
 
@@ -10657,7 +10657,7 @@ void MegaCmdExecuter::executecommand(vector<string> words, map<string, int> *clf
 
 
 
-        int limit = getintOption(cloptions, "limit", min(10,ndownloads+nuploads+(int)globalTransferListener->completedTransfers.size()));
+        int limit = getintOption(cloptions, "limit", min(10,ndownloads+nuploads+(int)globalTransferListener->getCompletedTransfersCount()));
 
         if (!transferdata)
         {
@@ -10679,32 +10679,24 @@ void MegaCmdExecuter::executecommand(vector<string> words, map<string, int> *clf
 
         vector<MegaTransfer *> transfersDLToShow;
         vector<MegaTransfer *> transfersUPToShow;
-        vector<MegaTransfer *> transfersCompletedToShow;
+        vector<std::unique_ptr<MegaTransfer>> transfersCompletedToShow;
 
         if (showcompleted)
         {
-            globalTransferListener->completedTransfersMutex.lock();
-            size_t totalcompleted = globalTransferListener->completedTransfers.size();
-            for (size_t i = 0;(i < totalcompleted)
-                 && (shownCompleted < totalcompleted)
-                 && (shownCompleted < (size_t)(limit+1)); //Note limit+1 to seek for one more to show if there are more to show!
-                 i++)
+            auto accept = [onlyuploads, onlydownloads, showsyncs](const MegaTransfer &transfer)
             {
-                MegaTransfer *transfer = globalTransferListener->completedTransfers.at(i);
-                if (
-                    (
-                            (transfer->getType() == MegaTransfer::TYPE_UPLOAD && (onlyuploads || (!onlyuploads && !onlydownloads) ))
-                        ||  (transfer->getType() == MegaTransfer::TYPE_DOWNLOAD && (onlydownloads || (!onlyuploads && !onlydownloads) ) )
-                    )
-                    &&  !(!showsyncs && transfer->isSyncTransfer())
-                    )
-                {
+                return (
+                        (
+                                (transfer.getType() == MegaTransfer::TYPE_UPLOAD && (onlyuploads || (!onlyuploads && !onlydownloads) ))
+                            ||  (transfer.getType() == MegaTransfer::TYPE_DOWNLOAD && (onlydownloads || (!onlyuploads && !onlydownloads) ) )
+                        )
+                        &&  !(!showsyncs && transfer.isSyncTransfer())
+                        );
+            };
 
-                    transfersCompletedToShow.push_back(transfer);
-                    shownCompleted++;
-                }
-            }
-            globalTransferListener->completedTransfersMutex.unlock();
+            //Note limit+1 to seek for one more to show if there are more to show!
+            transfersCompletedToShow = globalTransferListener->getCompletedTransfers((size_t)(limit+1), accept);
+            shownCompleted = (unsigned int)transfersCompletedToShow.size();
         }
 
         shown += shownCompleted;
@@ -10767,7 +10759,7 @@ void MegaCmdExecuter::executecommand(vector<string> words, map<string, int> *clf
             }
         }
 
-        vector<MegaTransfer *>::iterator itCompleted = transfersCompletedToShow.begin();
+        auto itCompleted = transfersCompletedToShow.begin();
         vector<MegaTransfer *>::iterator itDLs = transfersDLToShow.begin();
         vector<MegaTransfer *>::iterator itUPs = transfersUPToShow.begin();
 
@@ -10791,7 +10783,7 @@ void MegaCmdExecuter::executecommand(vector<string> words, map<string, int> *clf
             }
             else
             {
-                transfer = (MegaTransfer *) *itCompleted;
+                transfer = itCompleted->get();
                 itCompleted++;
                 deleteTransfer=false;
             }
